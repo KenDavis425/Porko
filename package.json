@@ -1,0 +1,26 @@
+{
+  "name": "my-vue-app",
+  "version": "1.0.0",
+  "description": "A simple Vue.js application",
+  "main": "src/main.js",
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "start": "node server.js",
+    "lint": "vue-cli-service lint"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "firebase": "^12.1.0",
+    "vue": "^3.0.0",
+    "vue3-google-map": "^0.23.1"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "^5.0.8",
+    "@vue/cli-service": "^5.0.8"
+  }
+}

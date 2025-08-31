@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users:
+    // - Anyone can create a user document for themselves.
+    // - Only the user can update their own document.
+    // - Anyone can read user profiles.
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Reviews:
+    // - Authenticated users can create reviews.
+    // - Users can update or delete their own reviews.
+    // - Anyone can read reviews.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && (
+        (resource.data.userId == request.auth.uid) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActivityAt']))
+      );
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+        // Post author can also delete comments
+        allow delete: if request.auth != null && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/reviews/$(reviewId)).data.userId == request.auth.uid);
+      }
+    }
+
+    // Follows:
+    // - Authenticated users can follow/unfollow others.
+    match /follows/{followId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Tags:
+    // - Authenticated users can create new tags.
+    // - Anyone can read tags.
+    match /tags/{tagId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+    }
+
+    // Restaurants:
+    // - Anyone can read restaurant data.
+    // - Authenticated users can create/update restaurants.
+    match /restaurants/{restaurantId} {
+      allow read: if true;
+      allow create, update: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow any authenticated user to read review images
+    match /users/{userId}/reviews/{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+
+    // Allow users to write only to their own folder
+    match /users/{userId}/{allPaths=**} {
+      allow write: if request.auth.uid == userId;
+    }
+  }
+}
+
