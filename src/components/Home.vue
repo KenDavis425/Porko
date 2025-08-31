@@ -91,6 +91,7 @@ export default {
     let observer = null;
     const unsubscribes = [];
     const bucketList = ref(new Set());
+    const leaderboardRanks = ref(new Map());
 
     onUnmounted(() => {
       unsubscribes.forEach(unsub => unsub());
@@ -134,6 +135,7 @@ export default {
         return;
       }
 
+      // Fetch initial data including the leaderboard to avoid race conditions
       const [followsSnap, restaurantsSnap, usersSnap, leaderboardSnap] = await Promise.all([
         getDocs(query(collection(db, 'follows'), where('followerId', '==', currentUser.uid))),
         getDocs(collection(db, 'restaurants')),
@@ -141,22 +143,29 @@ export default {
         getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3)))
       ]);
 
+      const initialRanks = new Map();
+      leaderboardSnap.forEach((doc, index) => {
+        initialRanks.set(doc.id, index);
+      });
+      leaderboardRanks.value = initialRanks;
+
       const restaurantsMap = new Map();
       restaurantsSnap.forEach(doc => {
         restaurantsMap.set(doc.id, doc.data());
       });
-
+      
       const usersMap = new Map();
       usersSnap.forEach(doc => {
         usersMap.set(doc.id, doc.data());
       });
 
-      const leaderboardRanks = new Map();
-      leaderboardSnap.forEach((doc, index) => {
-        leaderboardRanks.set(doc.id, index);
-      });
-
       const processAndSetPosts = () => {
+        // Always re-calculate medals before sorting and displaying
+        allPosts.forEach(post => {
+          const rank = leaderboardRanks.value.get(post.userId);
+          post.medal = getMedal(rank);
+        });
+
         fullSortedPosts.value = Array.from(allPosts.values()).sort((a, b) => {
             const timeA = a.lastActivityAt || a.createdAt;
             const timeB = b.lastActivityAt || b.createdAt;
@@ -166,6 +175,17 @@ export default {
         posts.value = fullSortedPosts.value.slice(0, posts.value.length || pageSize);
       };
 
+      const leaderboardQuery = query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3));
+      const unsubLeaderboard = onSnapshot(leaderboardQuery, (leaderboardSnap) => {
+        const newRanks = new Map();
+        leaderboardSnap.forEach((doc, index) => {
+          newRanks.set(doc.id, index);
+        });
+        leaderboardRanks.value = newRanks;
+        processAndSetPosts();
+      });
+      unsubscribes.push(unsubLeaderboard);
+
       const processSnapshot = (snapshot) => {
         snapshot.docChanges().forEach(change => {
           if (change.type === 'removed') {
@@ -174,7 +194,7 @@ export default {
             const docData = change.doc.data();
             const restaurant = restaurantsMap.get(docData.restaurantId);
             const user = usersMap.get(docData.userId);
-            const rank = leaderboardRanks.get(docData.userId);
+            const rank = leaderboardRanks.value.get(docData.userId); // Now guaranteed to have initial ranks
             const post = {
               ...docData,
               id: change.doc.id,

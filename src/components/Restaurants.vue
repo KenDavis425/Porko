@@ -14,6 +14,33 @@
     <div class="search-box">
       <input type="text" v-model="searchQuery" placeholder="Search by name, address, city, state, or zip..." class="search-input" />
     </div>
+    <div class="add-restaurant-container">
+      <button @click="showAddForm = !showAddForm" class="btn-toggle-add">
+        {{ showAddForm ? 'Cancel' : 'Add New Restaurant' }}
+      </button>
+      <form v-if="showAddForm" @submit.prevent="addNewRestaurant" class="add-restaurant-form">
+        <h3>Add a New Restaurant</h3>
+        <div class="form-group">
+          <label for="new-name">Name</label>
+          <input id="new-name" type="text" v-model="newRestaurant.name" required />
+        </div>
+        <div class="form-group">
+          <label for="new-address">Address</label>
+          <input id="new-address" type="text" v-model="newRestaurant.address" required />
+        </div>
+        <div class="form-group-row">
+          <div class="form-group"><label for="new-city">City</label><input id="new-city" type="text" v-model="newRestaurant.city" /></div>
+          <div class="form-group"><label for="new-state">State</label><input id="new-state" type="text" v-model="newRestaurant.state" /></div>
+          <div class="form-group"><label for="new-zip">Zip</label><input id="new-zip" type="text" v-model="newRestaurant.zip" /></div>
+        </div>
+        <div class="form-group">
+          <label for="new-url">Website URL</label>
+          <input id="new-url" type="url" v-model="newRestaurant.url" placeholder="https://example.com" />
+        </div>
+        <p v-if="addError" class="error-message">{{ addError }}</p>
+        <button type="submit" :disabled="isSaving" class="btn-save">{{ isSaving ? 'Saving...' : 'Save Restaurant' }}</button>
+      </form>
+    </div>
     <div v-if="loading" class="loading-indicator">Loading restaurants...</div>
     <div v-else class="restaurant-list-container">
       <ul v-if="filteredRestaurants.length > 0" class="restaurant-list">
@@ -48,6 +75,9 @@
             <a :href="getDetailsUrl(restaurant)" target="_blank" rel="noopener noreferrer" class="action-btn" title="View Details on Google">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 5 1.41-1.41L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
             </a>
+            <a v-if="restaurant.url" :href="getValidUrl(restaurant.url)" target="_blank" rel="noopener noreferrer" class="action-btn" title="Visit Website">
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            </a>
             <button class="check-in-btn" @click="$emit('review-at', restaurant.id)">Review</button>
           </div>
         </li>
@@ -80,6 +110,17 @@ export default {
     const restaurantForReviews = ref(null);
     const userLocation = ref(null);
     const bucketList = ref(new Set());
+    const showAddForm = ref(false);
+    const newRestaurant = ref({
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      zip: '',
+      url: ''
+    });
+    const addError = ref('');
+    const isSaving = ref(false);
     let bucketListUnsubscribe = () => {};
 
     const fetchRestaurantsAndRatings = async () => {
@@ -189,6 +230,14 @@ export default {
       return `https://www.google.com/search?q=${query}`;
     };
 
+    const getValidUrl = (url) => {
+      if (!url) return '#';
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+      }
+      return `https://${url}`;
+    };
+
     const openEditModal = (restaurant) => {
       restaurantToEdit.value = restaurant;
       isEditModalVisible.value = true;
@@ -209,38 +258,103 @@ export default {
       restaurantForReviews.value = null;
     };
 
-    const saveRestaurantChanges = async (updatedRestaurant) => {
+    const saveRestaurantChanges = async (updatedData) => {
+      const updatedRestaurant = { ...updatedData };
       if (!updatedRestaurant || !updatedRestaurant.id) return;
 
       const original = restaurantToEdit.value;
+      const dataToSave = {};
+
+      const nameChanged = original.name !== updatedRestaurant.name;
+      if (nameChanged) {
+        dataToSave.name = updatedRestaurant.name;
+        dataToSave.name_lowercase = updatedRestaurant.name.trim().toLowerCase();
+      }
+
       const addressParts = ['address', 'city', 'state', 'zip'];
       const addressChanged = addressParts.some(part => original[part] !== updatedRestaurant[part]);
 
       if (addressChanged) {
+        dataToSave.address = updatedRestaurant.address;
+        dataToSave.city = updatedRestaurant.city;
+        dataToSave.state = updatedRestaurant.state;
+        dataToSave.zip = updatedRestaurant.zip;
+        dataToSave.address_lowercase = (updatedRestaurant.address || '').trim().toLowerCase();
+        
         const fullAddress = [updatedRestaurant.address, updatedRestaurant.city, updatedRestaurant.state, updatedRestaurant.zip].filter(Boolean).join(', ');
         const { geocodeAddress } = await import('../utils/geocoding.js');
         const location = await geocodeAddress(fullAddress);
         if (location) {
-          updatedRestaurant.location = location;
+          dataToSave.location = location;
         } else {
           alert("Could not find a location for the provided address. Please check the address and try again. The restaurant will be saved without a location.");
-          updatedRestaurant.location = null;
+          dataToSave.location = null;
         }
       }
 
-      const { id, ...dataToSave } = updatedRestaurant;
-      const restaurantRef = doc(db, 'restaurants', id);
+      if (original.url !== updatedRestaurant.url) {
+        dataToSave.url = updatedRestaurant.url;
+      }
+
+      if (Object.keys(dataToSave).length === 0) {
+        closeEditModal();
+        return;
+      }
+
+      const restaurantRef = doc(db, 'restaurants', updatedRestaurant.id);
       try {
         await updateDoc(restaurantRef, dataToSave);
-        const index = restaurants.value.findIndex(r => r.id === id);
+        const index = restaurants.value.findIndex(r => r.id === updatedRestaurant.id);
         if (index !== -1) {
-          // Use splice to ensure reactivity
-          restaurants.value.splice(index, 1, { ...restaurants.value[index], ...updatedRestaurant });
+          const newLocalData = { ...restaurants.value[index], ...dataToSave };
+          if (dataToSave.location !== undefined) {
+            newLocalData.distance = userLocation.value && newLocalData.location ? getDistance(userLocation.value.lat, userLocation.value.lng, newLocalData.location.lat, newLocalData.location.lng) : null;
+          }
+          restaurants.value.splice(index, 1, newLocalData);
         }
         closeEditModal();
       } catch (error) {
         console.error("Error updating restaurant: ", error);
         alert("Failed to save changes. Please try again.");
+      }
+    };
+
+    const addNewRestaurant = async () => {
+      if (!newRestaurant.value.name.trim() || !newRestaurant.value.address.trim()) {
+        addError.value = 'Restaurant name and address are required.';
+        return;
+      }
+      isSaving.value = true;
+      addError.value = '';
+      const normalizedName = newRestaurant.value.name.trim().toLowerCase();
+      const normalizedAddress = newRestaurant.value.address.trim().toLowerCase();
+      try {
+        const q = query(collection(db, 'restaurants'), where('name_lowercase', '==', normalizedName), where('address_lowercase', '==', normalizedAddress));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          addError.value = 'This restaurant already exists.';
+          isSaving.value = false;
+          return;
+        }
+        const fullAddress = [newRestaurant.value.address, newRestaurant.value.city, newRestaurant.value.state, newRestaurant.value.zip].filter(Boolean).join(', ');
+        const { geocodeAddress } = await import('../utils/geocoding.js');
+        const location = await geocodeAddress(fullAddress);
+        if (!location) {
+          addError.value = "Could not find a location for the provided address. Please check the address and try again.";
+          isSaving.value = false;
+          return;
+        }
+        const docData = { name: newRestaurant.value.name.trim(), address: newRestaurant.value.address.trim(), city: newRestaurant.value.city.trim(), state: newRestaurant.value.state.trim(), zip: newRestaurant.value.zip.trim(), url: newRestaurant.value.url.trim(), name_lowercase: normalizedName, address_lowercase: normalizedAddress, location, createdAt: serverTimestamp() };
+        const docRef = await addDoc(collection(db, 'restaurants'), docData);
+        const newRest = { id: docRef.id, ...docData, averageRating: 0, ratingCount: 0, distance: userLocation.value ? getDistance(userLocation.value.lat, userLocation.value.lng, location.lat, location.lng) : null };
+        restaurants.value.push(newRest);
+        showAddForm.value = false;
+        newRestaurant.value = { name: '', address: '', city: '', state: '', zip: '', url: '' };
+      } catch (error) {
+        console.error("Error adding new restaurant:", error);
+        addError.value = 'Failed to add restaurant. Please try again.';
+      } finally {
+        isSaving.value = false;
       }
     };
 
@@ -272,6 +386,7 @@ export default {
       filteredRestaurants,
       getDirectionsUrl,
       getDetailsUrl,
+      getValidUrl,
       isEditModalVisible,
       restaurantToEdit,
       isReviewsModalVisible,
@@ -282,7 +397,12 @@ export default {
       openReviewsModal,
       closeReviewsModal,
       isInBucketList,
-      toggleBucketList
+      toggleBucketList,
+      showAddForm,
+      newRestaurant,
+      addNewRestaurant,
+      addError,
+      isSaving
     };
   }
 };
@@ -298,6 +418,54 @@ export default {
   border-radius: 8px;
   border: 1px solid #ddd;
   font-size: 1em;
+}
+.add-restaurant-container {
+  background: var(--card-background);
+  border-radius: 12px;
+  padding: 1.5em;
+  margin-bottom: 2em;
+  box-shadow: 0 4px 15px var(--shadow-color);
+}
+.btn-toggle-add {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  width: 100%;
+}
+.add-restaurant-form {
+  margin-top: 1.5em;
+  border-top: 1px solid #eee;
+  padding-top: 1.5em;
+}
+.add-restaurant-form h3 {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+.form-group {
+  margin-bottom: 1em;
+}
+.form-group-row {
+  display: flex;
+  gap: 1em;
+}
+.form-group-row .form-group {
+  flex: 1;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
 }
 .loading-indicator, .no-restaurants-message {
   text-align: center;
@@ -391,6 +559,23 @@ export default {
 }
 .check-in-btn:hover {
   background-color: var(--primary-dark-color);
+}
+.btn-save {
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-save:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+.error-message {
+  color: #e74c3c;
+  margin-top: 1em;
 }
 
 .in-bucket-list {

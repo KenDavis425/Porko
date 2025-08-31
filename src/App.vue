@@ -21,37 +21,37 @@
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
               <span>Home</span>
             </button>
+            <button class="sidebar-link" :class="{ 'active': currentPage === 'leaderboard' }" @click="goToLeaderboard" title="Leaderboard">
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 11V3H8v6H2v12h20V11h-6zm-6-6h4v14h-4V5zm-6 6h4v8H4v-8zm16 8h-4v-8h4v8z"/></svg>
+              <span>Leaderboard</span>
+            </button>
             <button class="sidebar-link" :class="{ 'active': currentPage === 'review' }" @click="goToReview" title="Write a Review">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm-1.5 9h-2v-2h2v2zm5 0h-2v-2h2v2zm-2.5-4h-2V5h2v2z"/></svg>
               <span>Write a Review</span>
-            </button>
-            <button class="sidebar-link" :class="{ 'active': currentPage === 'my-reviews' }" @click="goToMyReviews" title="My Reviews">
-              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-              <span>My Reviews</span>
             </button>
             <button class="sidebar-link" :class="{ 'active': currentPage === 'restaurants' }" @click="goToRestaurants" title="Restaurants">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 6v8h3v8h-3v-2h-2v2h-2v-2h-2v2H8v-2H6v2H3v-8h3V6c0-3.31 2.69-6 6-6s6 2.69 6 6zm-2 0c0-2.21-1.79-4-4-4s-4 1.79-4 4v8h8V6zm-5 3h2v2h-2z"/></svg>
               <span>Restaurants</span>
             </button>
-            <button class="sidebar-link" :class="{ 'active': currentPage === 'bucket-list' }" @click="goToBucketList" title="Bucket List">
-              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 7h-2.06c-.33-3.2-2.46-5.8-5.94-5.8S4.39 3.8 4.06 7H2v12h16V7zM6.14 7c.2-1.92 1.6-3.48 3.86-3.8A4.002 4.002 0 0 1 14 7h-2.14c-.2-1.92-1.6-3.48-3.86-3.8zM16 17H4v-8h12v8z"/></svg>
-              <span>Bucket List</span>
-            </button>
             <button class="sidebar-link" :class="{ 'active': currentPage === 'recommendations' }" @click="goToRecommendations" title="Recommendations">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/></svg>
               <span>Recommendations</span>
-            </button>
-            <button class="sidebar-link" :class="{ 'active': currentPage === 'leaderboard' }" @click="goToLeaderboard" title="Leaderboard">
-              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 11V3H8v6H2v12h20V11h-6zm-6-6h4v14h-4V5zm-6 6h4v8H4v-8zm16 8h-4v-8h4v8z"/></svg>
-              <span>Leaderboard</span>
             </button>
             <button class="sidebar-link" :class="{ 'active': currentPage === 'user-search' }" @click="goToUserSearch" title="Follow Users">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 5 1.41-1.41L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM12 10V7H8v3H5v2h3v3h2v-3h3v-2h-3z"/></svg>
               <span>Follow Users</span>
             </button>
-            <button class="sidebar-link" :class="{ 'active': currentPage === 'followers' }" @click="goToFollowers" title="Followers">
+            <button class="sidebar-link" :class="{ 'active': currentPage === 'bucket-list' }" @click="goToBucketList" title="My Bucket List">
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 7h-2.06c-.33-3.2-2.46-5.8-5.94-5.8S4.39 3.8 4.06 7H2v12h16V7zM6.14 7c.2-1.92 1.6-3.48 3.86-3.8A4.002 4.002 0 0 1 14 7h-2.14c-.2-1.92-1.6-3.48-3.86-3.8zM16 17H4v-8h12v8z"/></svg>
+              <span>My Bucket List</span>
+            </button>
+            <button class="sidebar-link" :class="{ 'active': currentPage === 'my-reviews' }" @click="goToMyReviews" title="My Reviews">
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+              <span>My Reviews</span>
+            </button>
+            <button class="sidebar-link" :class="{ 'active': currentPage === 'followers' }" @click="goToFollowers" title="My Followers">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-              <span>Followers</span>
+              <span>My Followers</span>
             </button>
             <button class="sidebar-link" :class="{ 'active': currentPage === 'following' }" @click="goToFollowing" title="Following">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9zM4 10.1v2.83c2.39 0 4.33 1.94 4.33 4.33h2.83c0-3.98-3.23-7.16-7.16-7.16z"/></svg>
@@ -80,6 +80,10 @@
           :selected-restaurant-id="selectedRestaurantForReview"
         />
       </main>
+    </div>
+    <div v-if="updateExists" class="update-banner">
+      A new version is available.
+      <button @click="refreshApp">Refresh</button>
     </div>
   </div>
 </template>
@@ -122,6 +126,34 @@ export default {
     const currentPage = ref('home');
     const selectedRestaurantForReview = ref(null);
     const isSidebarCollapsed = ref(window.innerWidth < 768);
+    const updateExists = ref(false);
+    const registration = ref(null);
+    let refreshing = false;
+
+    const refreshApp = () => {
+      updateExists.value = false;
+      // Make sure we have a registration and that there's a waiting worker
+      if (!registration.value || !registration.value.waiting) {
+        return;
+      }
+      // Send a message to the waiting service worker to take over.
+      registration.value.waiting.postMessage({ type: 'SKIP_WAITING' });
+    };
+
+    // This event is dispatched from src/registerServiceWorker.js
+    const onUpdateAvailable = (event) => {
+      registration.value = event.detail;
+      updateExists.value = true;
+    };
+
+    document.addEventListener('swUpdated', onUpdateAvailable, { once: true });
+
+    // Reload the page once the new service worker has taken control.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
 
     const isAdmin = computed(() => {
       return user.value && user.value.email === 'kennected.com@gmail.com';
@@ -231,7 +263,7 @@ export default {
       currentPage.value = 'review';
     };
 
-    return { user, loginWithGoogle, logout, seedSampleData, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent };
+    return { user, loginWithGoogle, logout, seedSampleData, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, updateExists, refreshApp };
   }
 }; 
 </script>
@@ -446,5 +478,30 @@ body {
   position: static;
   margin: -1em auto 1em;
   background-color: #f0f0f0;
+}
+
+.update-banner {
+  position: fixed;
+  bottom: 1em;
+  right: 1em;
+  background-color: #2c3e50;
+  color: white;
+  padding: 1em 1.5em;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+}
+
+.update-banner button {
+  margin-left: 1em;
+  background-color: #42b983;
+  color: white;
+  border: none;
+  padding: 0.5em 1em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
 }
 </style>

@@ -121,7 +121,7 @@
           <textarea id="comment" v-model="comment" rows="4" placeholder="How was the tenderloin?"></textarea>
         </div>
 
-        <button type="submit" :disabled="submitting || !selectedRestaurant || rating === 0">
+        <button type="submit" :disabled="submitting || !selectedRestaurant || !rating">
           {{ submitting ? 'Submitting...' : 'Submit Review' }}
         </button>
         <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
@@ -131,8 +131,10 @@
 </template>
 <script>
 import { ref, onMounted, nextTick } from 'vue';
-import { db, auth } from '../../firebase';
+import { db, auth } from '../firebase';
 import { collection, getDocs, addDoc, serverTimestamp, query, orderBy, where, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getDistance } from '../utils/geolocation.js';
+import { geocodeAddress } from '../utils/geocoding.js';
 import { getStorage, ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 
 export default {
@@ -146,8 +148,8 @@ export default {
   emits: ['reviewed'],
   setup(props, { emit }) {
     const restaurants = ref([]);
-    const selectedRestaurant = ref(props.selectedRestaurantId || '');
-    const rating = ref(0);
+    const selectedRestaurant = ref(props.selectedRestaurantId || null);
+    const rating = ref(null);
     const hoverRating = ref(0);
     const comment = ref('');
     const submitting = ref(false);
@@ -170,10 +172,14 @@ export default {
     const fullStarPath = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z";
     const emptyStarPath = "M22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.64-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z";
 
-    onMounted(async () => {
+    const fetchTags = async () => {
       const tagsQuery = query(collection(db, 'tags'), orderBy('name'));
+      const tagsSnapshot = await getDocs(tagsQuery);
+      tags.value = tagsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    };
 
-      const locationPromise = new Promise((resolve) => {
+    const getUserLocation = () => {
+      return new Promise((resolve) => {
         if (navigator.geolocation && !props.selectedRestaurantId) {
           navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -190,54 +196,52 @@ export default {
           resolve();
         }
       });
-      
+    };
+
+    const selectClosestRestaurant = () => {
+      if (!userLocation.value || restaurants.value.length === 0) return;
+
+      let closestRestaurant = null;
+      let minDistance = Infinity;
+
+      restaurants.value.forEach(restaurant => {
+        if (restaurant.location) {
+          const distance = getDistance(
+            userLocation.value.lat,
+            userLocation.value.lng,
+            restaurant.location.lat,
+            restaurant.location.lng
+          );
+          if (distance !== null && distance < minDistance) {
+            minDistance = distance;
+            closestRestaurant = restaurant;
+          }
+        }
+      });
+
+      if (closestRestaurant) {
+        selectedRestaurant.value = closestRestaurant.id;
+      }
+    };
+
+    const fetchInitialData = async () => {
       if (props.selectedRestaurantId) {
         const restaurantRef = doc(db, 'restaurants', props.selectedRestaurantId);
-        const [tagsSnapshot, restaurantSnap] = await Promise.all([
-          getDocs(tagsQuery),
-          getDoc(restaurantRef)
-        ]);
-        
-        tags.value = tagsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const restaurantSnap = await getDoc(restaurantRef);
         if (restaurantSnap.exists()) {
             restaurants.value = [{ id: restaurantSnap.id, ...restaurantSnap.data() }];
         }
       } else {
         const restaurantsQuery = query(collection(db, 'restaurants'), orderBy('name'));
-        const [tagsSnapshot, restaurantsSnapshot] = await Promise.all([
-            getDocs(tagsQuery),
-            getDocs(restaurantsQuery)
-        ]);
-        
-        tags.value = tagsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const restaurantsSnapshot = await getDocs(restaurantsQuery);
         restaurants.value = restaurantsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        await locationPromise;
-
-        if (userLocation.value && restaurants.value.length > 0) {
-          let closestRestaurant = null;
-          let minDistance = Infinity;
-          const { getDistance } = await import('../utils/geolocation.js');
-
-          restaurants.value.forEach(restaurant => {
-            if (restaurant.location) {
-              const distance = getDistance(
-                userLocation.value.lat,
-                userLocation.value.lng,
-                restaurant.location.lat,
-                restaurant.location.lng
-              );
-              if (distance !== null && distance < minDistance) {
-                minDistance = distance;
-                closestRestaurant = restaurant;
-              }
-            }
-          });
-          if (closestRestaurant) {
-            selectedRestaurant.value = closestRestaurant.id;
-          }
-        }
+        await getUserLocation();
+        selectClosestRestaurant();
       }
+    };
+
+    onMounted(async () => {
+      await Promise.all([fetchTags(), fetchInitialData()]);
     });
 
     const getStarPath = (starIndex) => {
@@ -300,7 +304,6 @@ export default {
         }
 
         const fullAddress = [newRestaurant.value.address, newRestaurant.value.city, newRestaurant.value.state, newRestaurant.value.zip].filter(Boolean).join(', ');
-        const { geocodeAddress } = await import('../../utils/geocoding.js');
         const location = await geocodeAddress(fullAddress);
 
         if (!location) {
@@ -406,7 +409,7 @@ export default {
 
     const submitReview = async () => {
       const currentUser = auth.currentUser;
-      if (!currentUser || !selectedRestaurant.value || rating.value === 0) {
+      if (!currentUser || !selectedRestaurant.value || !rating.value) {
         errorMessage.value = "Please select a restaurant and provide a rating.";
         return;
       }
