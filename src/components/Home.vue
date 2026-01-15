@@ -115,6 +115,7 @@ export default {
     const leaderboardRanks = ref(new Map());
     const restaurantsMap = ref(new Map());
     const sortOrder = ref('time'); // 'time' or 'distance'
+    let isSettingUpListeners = false; // Guard to prevent concurrent setup
 
     const processAndSetPosts = () => {
       // Always re-calculate medals before sorting and displaying
@@ -183,7 +184,7 @@ export default {
       // Re-fetch the feed if the user logs in or out.
       // The check ensures this doesn't run unnecessarily on initial load
       // if the user was already logged in.
-      if (newUser?.uid !== oldUser?.uid) {
+      if (newUser?.uid !== oldUser?.uid && !isSettingUpListeners) {
         setupFeedListeners();
       }
     });
@@ -194,138 +195,183 @@ export default {
     });
 
     const setupFeedListeners = async () => {
-      loading.value = true;
-      // Clear existing listeners and posts
-      unsubscribes.forEach(unsub => unsub());
-      unsubscribes.length = 0;
-      allPosts.clear();
-
-      const currentUser = props.user;
-      if (!currentUser) {
-        bucketList.value.clear();
-      } else {
-        const bucketListQuery = query(collection(db, 'bucketListItems'), where('userId', '==', currentUser.uid));
-        const unsubBucketList = onSnapshot(bucketListQuery, (snapshot) => {
-          const newBucketList = new Set();
-          snapshot.forEach(doc => newBucketList.add(doc.data().restaurantId));
-          bucketList.value = newBucketList;
-        });
-        unsubscribes.push(unsubBucketList);
+      // Prevent concurrent calls
+      if (isSettingUpListeners) {
+        return;
       }
-
-      // Fetch initial data including the leaderboard to avoid race conditions
-      const followsPromise = currentUser ? getDocs(query(collection(db, 'follows'), where('followerId', '==', currentUser.uid))) : Promise.resolve({ docs: [] });
-      const [followsSnap, restaurantsSnap, usersSnap, leaderboardSnap] = await Promise.all([
-        followsPromise,
-        getDocs(collection(db, 'restaurants')),
-        getDocs(collection(db, 'users')),
-        getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3)))
-      ]);
-
-      const initialRanks = new Map();
-      leaderboardSnap.forEach((doc, index) => {
-        initialRanks.set(doc.id, index);
-      });
-      leaderboardRanks.value = initialRanks;
-
-      restaurantsMap.value.clear();
-      restaurantsSnap.forEach(doc => {
-        restaurantsMap.value.set(doc.id, doc.data());
-      });
       
-      const usersMap = new Map();
-      usersSnap.forEach(doc => {
-        usersMap.set(doc.id, doc.data());
-      });
+      isSettingUpListeners = true;
+      loading.value = true;
+      
+      try {
+        // Clear existing listeners and posts
+        // Unsubscribe from all existing listeners first
+        unsubscribes.forEach(unsub => {
+          try {
+            unsub();
+          } catch (err) {
+            console.warn('Error unsubscribing listener:', err);
+          }
+        });
+        unsubscribes.length = 0;
+        allPosts.clear();
+        
+        // Give Firestore a moment to clean up before setting up new listeners
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      const leaderboardQuery = query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3));
-      const unsubLeaderboard = onSnapshot(leaderboardQuery, (leaderboardSnap) => {
-        const newRanks = new Map();
+        const currentUser = props.user;
+        if (!currentUser) {
+          bucketList.value.clear();
+        } else {
+          const bucketListQuery = query(collection(db, 'bucketListItems'), where('userId', '==', currentUser.uid));
+          const unsubBucketList = onSnapshot(
+            bucketListQuery, 
+            (snapshot) => {
+              const newBucketList = new Set();
+              snapshot.forEach(doc => newBucketList.add(doc.data().restaurantId));
+              bucketList.value = newBucketList;
+            },
+            (error) => {
+              console.error('Error in bucket list listener:', error);
+            }
+          );
+          unsubscribes.push(unsubBucketList);
+        }
+
+        // Fetch initial data including the leaderboard to avoid race conditions
+        const followsPromise = currentUser ? getDocs(query(collection(db, 'follows'), where('followerId', '==', currentUser.uid))) : Promise.resolve({ docs: [] });
+        const [followsSnap, restaurantsSnap, usersSnap, leaderboardSnap] = await Promise.all([
+          followsPromise,
+          getDocs(collection(db, 'restaurants')),
+          getDocs(collection(db, 'users')),
+          getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3)))
+        ]);
+
+        const initialRanks = new Map();
         leaderboardSnap.forEach((doc, index) => {
-          newRanks.set(doc.id, index);
+          initialRanks.set(doc.id, index);
         });
-        leaderboardRanks.value = newRanks;
-        processAndSetPosts();
-      });
-      unsubscribes.push(unsubLeaderboard);
+        leaderboardRanks.value = initialRanks;
 
-      const processSnapshot = (snapshot) => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === 'removed') {
-            allPosts.delete(change.doc.id);
-          } else {
-            const docData = change.doc.data();
-            const restaurant = restaurantsMap.value.get(docData.restaurantId);
-            const user = usersMap.get(docData.userId);
-            const rank = leaderboardRanks.value.get(docData.userId); // Now guaranteed to have initial ranks
-            const post = {
-              ...docData,
-              id: change.doc.id,
-              restaurantName: restaurant?.name || 'Unknown Restaurant',
-              restaurantCity: restaurant?.city,
-              restaurantState: restaurant?.state,
-              location: restaurant?.location || null,
-              distance: userLocation.value && restaurant?.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null,
-              userName: user?.displayName || 'Unknown User',
-              userPhoto: user?.photoURL || null,
-              medal: getMedal(rank)
-            };
-            allPosts.set(post.id, post);
-          }
+        restaurantsMap.value.clear();
+        restaurantsSnap.forEach(doc => {
+          restaurantsMap.value.set(doc.id, doc.data());
         });
-        processAndSetPosts();
-        loading.value = false;
-      };
+        
+        const usersMap = new Map();
+        usersSnap.forEach(doc => {
+          usersMap.set(doc.id, doc.data());
+        });
 
-      if (currentUser) {
-        // --- LOGGED-IN USER LOGIC ---
-        const followingIds = followsSnap.docs.map(doc => doc.data().followingId);
-        // Add current user's ID to see their own posts
-        if (!followingIds.includes(currentUser.uid)) {
-          followingIds.push(currentUser.uid);
-        }
-        if (followingIds.length > 0) {
-          // Firestore 'in' query is limited to 30 elements, so we batch
-          for (let i = 0; i < followingIds.length; i += 30) {
-              const batchIds = followingIds.slice(i, i + 30);
-              const q = query(collection(db, 'reviews'), where('userId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
-              const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (followed):", error));
-              unsubscribes.push(unsub);
+        const leaderboardQuery = query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3));
+        const unsubLeaderboard = onSnapshot(
+          leaderboardQuery, 
+          (leaderboardSnap) => {
+            const newRanks = new Map();
+            leaderboardSnap.forEach((doc, index) => {
+              newRanks.set(doc.id, index);
+            });
+            leaderboardRanks.value = newRanks;
+            processAndSetPosts();
+          },
+          (error) => {
+            console.error('Error in leaderboard listener:', error);
           }
-        }
+        );
+        unsubscribes.push(unsubLeaderboard);
 
-        if (userLocation.value) {
-          const nearbyRestaurantIds = [];
-          restaurantsSnap.forEach(doc => {
-            const restaurant = doc.data();
-            if (restaurant.location) {
-              const distance = getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng);
-              if (distance !== null && distance <= 100) {
-                nearbyRestaurantIds.push(doc.id);
-              }
+        const processSnapshot = (snapshot) => {
+          snapshot.docChanges().forEach(change => {
+            if (change.type === 'removed') {
+              allPosts.delete(change.doc.id);
+            } else {
+              const docData = change.doc.data();
+              const restaurant = restaurantsMap.value.get(docData.restaurantId);
+              const user = usersMap.get(docData.userId);
+              const rank = leaderboardRanks.value.get(docData.userId); // Now guaranteed to have initial ranks
+              const post = {
+                ...docData,
+                id: change.doc.id,
+                restaurantName: restaurant?.name || 'Unknown Restaurant',
+                restaurantCity: restaurant?.city,
+                restaurantState: restaurant?.state,
+                location: restaurant?.location || null,
+                distance: userLocation.value && restaurant?.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null,
+                userName: user?.displayName || 'Unknown User',
+                userPhoto: user?.photoURL || null,
+                medal: getMedal(rank)
+              };
+              allPosts.set(post.id, post);
             }
           });
-          if (nearbyRestaurantIds.length > 0) {
-              for (let i = 0; i < nearbyRestaurantIds.length; i += 30) {
-                  const batchIds = nearbyRestaurantIds.slice(i, i + 30);
-                  const q = query(collection(db, 'reviews'), where('restaurantId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
-                  const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (nearby):", error));
-                  unsubscribes.push(unsub);
-              }
-          }
-        }
-      } else {
-        // --- GUEST USER LOGIC ---
-        // Fetch a pool of the 50 most recent reviews globally.
-        // The sorting function will then correctly order them by distance if location is available,
-        // or by time if not.
-        const recentReviewsQuery = query(collection(db, 'reviews'), orderBy('lastActivityAt', 'desc'), limit(50));
-        const unsub = onSnapshot(recentReviewsQuery, processSnapshot, (error) => console.error("Feed error (recent for guests):", error));
-        unsubscribes.push(unsub);
-      }
+          processAndSetPosts();
+          loading.value = false;
+        };
 
-      if (unsubscribes.length === 0) {
+        if (currentUser) {
+          // --- LOGGED-IN USER LOGIC ---
+          const followingIds = followsSnap.docs.map(doc => doc.data().followingId);
+          // Add current user's ID to see their own posts
+          if (!followingIds.includes(currentUser.uid)) {
+            followingIds.push(currentUser.uid);
+          }
+          if (followingIds.length > 0) {
+            // Firestore 'in' query is limited to 30 elements, so we batch
+            for (let i = 0; i < followingIds.length; i += 30) {
+                const batchIds = followingIds.slice(i, i + 30);
+                const q = query(collection(db, 'reviews'), where('userId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
+                const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (followed):", error));
+                unsubscribes.push(unsub);
+            }
+          }
+
+          if (userLocation.value) {
+            const nearbyRestaurantIds = [];
+            restaurantsSnap.forEach(doc => {
+              const restaurant = doc.data();
+              if (restaurant.location) {
+                const distance = getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng);
+                if (distance !== null && distance <= 100) {
+                  nearbyRestaurantIds.push(doc.id);
+                }
+              }
+            });
+            if (nearbyRestaurantIds.length > 0) {
+                for (let i = 0; i < nearbyRestaurantIds.length; i += 30) {
+                    const batchIds = nearbyRestaurantIds.slice(i, i + 30);
+                    const q = query(collection(db, 'reviews'), where('restaurantId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
+                    const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (nearby):", error));
+                    unsubscribes.push(unsub);
+                }
+            }
+          }
+        } else {
+          // --- GUEST USER LOGIC ---
+          // Fetch a pool of the 50 most recent reviews globally.
+          // The sorting function will then correctly order them by distance if location is available,
+          // or by time if not.
+          const recentReviewsQuery = query(collection(db, 'reviews'), orderBy('lastActivityAt', 'desc'), limit(50));
+          const unsub = onSnapshot(recentReviewsQuery, processSnapshot, (error) => console.error("Feed error (recent for guests):", error));
+          unsubscribes.push(unsub);
+        }
+
+        if (unsubscribes.length === 0) {
+          loading.value = false;
+        }
+      } catch (error) {
+        console.error('Error setting up feed listeners:', error);
         loading.value = false;
+        // Make sure to clean up any listeners that might have been set up
+        unsubscribes.forEach(unsub => {
+          try {
+            unsub();
+          } catch (err) {
+            // Ignore cleanup errors
+          }
+        });
+        unsubscribes.length = 0;
+      } finally {
+        isSettingUpListeners = false;
       }
     };
 

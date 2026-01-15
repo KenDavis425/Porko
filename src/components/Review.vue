@@ -132,7 +132,7 @@
 <script>
 import { ref, onMounted, nextTick } from 'vue';
 import { db, auth } from '../firebase';
-import { collection, getDocs, addDoc, serverTimestamp, query, orderBy, where, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp, query, orderBy, where, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { getDistance } from '../utils/geolocation.js';
 import { geocodeAddress } from '../utils/geocoding.js';
 import { getStorage, ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
@@ -439,6 +439,11 @@ export default {
           createdAt: timestamp,
           lastActivityAt: timestamp
         });
+
+        // Update the user's reviewCount atomically
+        // Using increment() ensures thread-safe updates and handles the case where reviewCount doesn't exist yet
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, { reviewCount: increment(1) });
 
         // Check if this restaurant is on the bucket list and mark as complete
         const bucketListQuery = query(

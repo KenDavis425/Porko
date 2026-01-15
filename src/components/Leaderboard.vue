@@ -38,14 +38,37 @@ export default {
 
     onMounted(() => {
       try {
+        // Fetch more users initially (e.g., 30) to account for filtering out users with 0 reviews
+        // After filtering and sorting, we'll display the top 10 reviewers
         const usersQuery = query(
           collection(db, 'users'),
           orderBy('reviewCount', 'desc'),
-          limit(10)
+          limit(30)
         );
         
         unsubscribe = onSnapshot(usersQuery, (querySnapshot) => {
-          users.value = querySnapshot.docs.map(doc => doc.data());
+          // Map documents to user data
+          const fetchedUsers = querySnapshot.docs.map(doc => doc.data());
+          
+          // Filter out users with 0 or undefined reviewCount
+          // Only show users who have actually made reviews (leaders should have reviews)
+          const usersWithReviews = fetchedUsers.filter(user => {
+            const count = Number(user.reviewCount) || 0;
+            return count > 0;
+          });
+          
+          // Sort by reviewCount numerically in descending order (highest first)
+          // This ensures proper sorting even if Firestore ordering has issues
+          // Convert reviewCount to number for reliable numerical comparison
+          const sortedUsers = usersWithReviews.sort((a, b) => {
+            const countA = Number(a.reviewCount) || 0;
+            const countB = Number(b.reviewCount) || 0;
+            return countB - countA; // Descending order (highest first)
+          });
+          
+          // Take only the top 10 users after filtering and sorting
+          users.value = sortedUsers.slice(0, 10);
+          
           loading.value = false;
         }, (error) => {
           console.error("Error fetching leaderboard:", error);
@@ -63,10 +86,15 @@ export default {
     });
 
     const getMedal = (index) => {
+      // Medals are assigned based on position (0-indexed)
+      // Position 1 (index 0): Gold medal 🥇
+      // Position 2 (index 1): Silver medal 🥈
+      // Position 3 (index 2): Bronze medal 🥉
+      // Positions 4-10 (index 3-9): Participation medal 🏅
       if (index === 0) return '🥇';
       if (index === 1) return '🥈';
       if (index === 2) return '🥉';
-      if (index >= 3 && index < 10 ) return '🏅';
+      if (index >= 3 && index < 10) return '🏅';
       return null;
     };
 

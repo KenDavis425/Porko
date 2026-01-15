@@ -64,6 +64,10 @@
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
               <span>Database Stats</span>
             </button>
+            <button v-if="isAdmin" class="sidebar-link" :class="{ 'active': currentPage === 'backfill-admin' }" @click="goToBackfillAdmin" title="Backfill Admin">
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M13 3a9 9 0 1 0 8.95 8H19a7 7 0 1 1-6.97-6V3zM12 8v5l4 2"/></svg>
+              <span>Backfill Admin</span>
+            </button>
             <button v-if="user" class="sidebar-link" @click="logout" title="Logout">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
               <span>Logout</span>
@@ -110,6 +114,7 @@ import UserSearch from './components/UserSearch.vue';
 import Review from './components/Review.vue';
 import Recommendations from './components/Recommendations.vue';
 import DatabaseStats from './components/DatabaseStats.vue';
+import BackfillAdmin from './components/BackfillAdmin.vue';
 import MyReviews from './components/MyReviews.vue';
 import Leaderboard from './components/Leaderboard.vue';
 import Followers from './components/Followers.vue';
@@ -131,6 +136,7 @@ export default {
     Review,
     Recommendations,
     DatabaseStats,
+    BackfillAdmin,
     MyReviews,
     Leaderboard,
     Followers,
@@ -173,7 +179,7 @@ export default {
 
     const protectedPages = new Set([
       'review', 'user-search', 'bucket-list', 'my-reviews', 
-      'followers', 'following', 'database-stats'
+      'followers', 'following', 'database-stats', 'backfill-admin'
     ]);
 
     const componentMap = {
@@ -187,6 +193,7 @@ export default {
       'leaderboard': 'Leaderboard',
       'cleanup': 'Cleanup',
       'database-stats': 'DatabaseStats',
+      'backfill-admin': 'BackfillAdmin',
       'followers': 'Followers',
       'following': 'Following'
     };
@@ -203,17 +210,21 @@ export default {
     onAuthStateChanged(auth, async (u) => {
       user.value = u;
       if (u) { // User is logged in
-        const userRef = doc(db, 'users', u.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            uid: u.uid,
-            displayName: u.displayName,
-            email: u.email,
-            photoURL: u.photoURL,
-            createdAt: new Date(),
-            reviewCount: 0
-          });
+        try {
+          const userRef = doc(db, 'users', u.uid);
+          const userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              uid: u.uid,
+              displayName: u.displayName,
+              email: u.email,
+              photoURL: u.photoURL,
+              createdAt: new Date(),
+              reviewCount: 0
+            });
+          }
+        } catch (error) {
+          console.error('Error checking/creating user document:', error);
         }
       } else { // User is logged out or a guest
         // If they were on a protected page, redirect to home
@@ -267,6 +278,10 @@ export default {
       currentPage.value = 'database-stats';
     };
 
+    const goToBackfillAdmin = () => {
+      currentPage.value = 'backfill-admin';
+    };
+
     const goToFollowers = () => {
       currentPage.value = 'followers';
     };
@@ -284,7 +299,7 @@ export default {
       currentPage.value = 'review';
     };
 
-    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, backfillInProgress, backfillStatus, runBackfill };
+    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToBackfillAdmin, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, backfillInProgress, backfillStatus, runBackfill };
   }
 }; 
 </script>

@@ -41,7 +41,7 @@
 <script>
 import { ref } from 'vue';
 import { db, storage } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import StarRating from './StarRating.vue';
 
@@ -155,6 +155,12 @@ export default {
         };
 
         await addDoc(collection(db, 'reviews'), reviewData);
+        
+        // Update the user's reviewCount atomically
+        // Using increment() ensures thread-safe updates and handles the case where reviewCount doesn't exist yet
+        const userRef = doc(db, 'users', props.user.uid);
+        await updateDoc(userRef, { reviewCount: increment(1) });
+        
         emit('review-added', props.restaurantId);
       } catch (e) {
         if (!error.value) { // Don't overwrite upload-specific error
