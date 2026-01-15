@@ -14,12 +14,23 @@
       </div>
     </div>
 
+    <div class="sort-toggle" v-if="userLocation">
+      <button @click="setSortOrder('time')" :class="{ active: sortOrder === 'time' }">Most Recent</button>
+      <button @click="setSortOrder('distance')" :class="{ active: sortOrder === 'distance' }">Nearby</button>
+    </div>
+
     <div class="feed">
       <div v-if="loading" class="loading-indicator">Loading feed...</div>
       <div v-else>
         <div v-if="posts.length === 0" class="no-posts-message">
-          <h3>Welcome to Porko!</h3>
-          <p>Follow some users to see their reviews in your feed, or check out the Restaurants page to find new places.</p>
+          <div v-if="user">
+            <h3>Your Feed is Empty</h3>
+            <p>Follow some users to see their reviews here, or check out the Restaurants page to find new places.</p>
+          </div>
+          <div v-else>
+            <h3>Welcome to PorkHub!</h3>
+            <p>There are no reviews to show right now. Check out the Restaurants page to discover new places!</p>
+          </div>
         </div>
         <div v-for="post in posts" :key="post.id" class="post-card">
           <div class="post-header">
@@ -35,14 +46,17 @@
           <div class="post-content">
             <div class="post-title-line">
               <div class="restaurant-title-group">
-                <h4 class="restaurant-name">{{ post.restaurantName }}</h4>
-                <button @click="toggleBucketList(post)" class="action-btn bucket-list-btn" :class="{ 'in-bucket-list': isInBucketList(post.restaurantId) }" :title="isInBucketList(post.restaurantId) ? 'In Bucket List' : 'Add to Bucket List'">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 7h-2.06c-.33-3.2-2.46-5.8-5.94-5.8S4.39 3.8 4.06 7H2v12h16V7zM6.14 7c.2-1.92 1.6-3.48 3.86-3.8A4.002 4.002 0 0 1 14 7h-2.14c-.2-1.92-1.6-3.48-3.86-3.8zM16 17H4v-8h12v8z"/></svg>
-                </button>
+                <h2 class="restaurant-name">{{ post.restaurantName }}</h2>
+              <button v-if="user" @click="toggleBucketList(post)" class="action-btn bucket-list-btn" :class="{ 'in-bucket-list': isInBucketList(post.restaurantId) }" :title="isInBucketList(post.restaurantId) ? 'In Bucket List' : 'Add to Bucket List'">
+                <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 7h-2.06c-.33-3.2-2.46-5.8-5.94-5.8S4.39 3.8 4.06 7H2v12h16V7zM6.14 7c.2-1.92 1.6-3.48 3.86-3.8A4.002 4.002 0 0 1 14 7h-2.14c-.2-1.92-1.6-3.48-3.86-3.8zM16 17H4v-8h12v8z"/></svg>
+              </button>
               </div>
               <div v-if="post.distance !== null" class="distance">
                 {{ post.distance.toFixed(1) }} miles away
               </div>
+            </div>
+            <div v-if="post.restaurantCity || post.restaurantState" class="restaurant-location">
+              {{ post.restaurantCity }}<template v-if="post.restaurantCity && post.restaurantState">, </template>{{ post.restaurantState }}
             </div>
             <div class="review-body">
               <StarRating :rating="post.rating" />
@@ -53,6 +67,7 @@
               </div>
             </div>
             <Comments :post-id="post.id"
+                      :user="user"
                       post-type="reviews"
                       :post-author-id="post.userId" />
           </div>
@@ -66,7 +81,7 @@
 
 <script>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
-import { db, auth } from '../firebase';
+import { db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import Comments from './Comments.vue';
 import StarRating from './StarRating.vue';
@@ -78,7 +93,13 @@ export default {
     StarRating,
     Comments
   },
-  setup() {
+  props: {
+    user: {
+      type: Object,
+      default: null
+    }
+  },
+  setup(props) {
     const posts = ref([]);
     const loading = ref(true);
     const userLocation = ref(null);
@@ -92,6 +113,39 @@ export default {
     const unsubscribes = [];
     const bucketList = ref(new Set());
     const leaderboardRanks = ref(new Map());
+    const restaurantsMap = ref(new Map());
+    const sortOrder = ref('time'); // 'time' or 'distance'
+
+    const processAndSetPosts = () => {
+      // Always re-calculate medals before sorting and displaying
+      allPosts.forEach(post => {
+        const rank = leaderboardRanks.value.get(post.userId);
+        post.medal = getMedal(rank);
+      });
+
+      const sortedPosts = Array.from(allPosts.values()).sort((a, b) => {
+          if (sortOrder.value === 'distance' && userLocation.value) {
+            const distanceA = a.distance ?? Infinity;
+            const distanceB = b.distance ?? Infinity;
+
+            if (distanceA !== distanceB) {
+              return distanceA - distanceB;
+            }
+            // If distances are equal (e.g. same restaurant), sub-sort by time
+            const timeA = a.lastActivityAt || a.createdAt;
+            const timeB = b.lastActivityAt || b.createdAt;
+            return timeB.seconds - timeA.seconds;
+          }
+
+          // Default sort by time
+          const timeA = a.lastActivityAt || a.createdAt;
+          const timeB = b.lastActivityAt || b.createdAt;
+          return timeB.seconds - timeA.seconds;
+      });
+      fullSortedPosts.value = sortedPosts;
+      // Update the displayed posts, preserving the current scroll length
+      posts.value = fullSortedPosts.value.slice(0, posts.value.length || pageSize);
+    };
 
     onUnmounted(() => {
       unsubscribes.forEach(unsub => unsub());
@@ -106,7 +160,32 @@ export default {
           loadMorePosts();
         }
       });
-      checkLocationPermission();
+      checkLocationPermission(); // Now called once on mount.
+    });
+
+    watch(userLocation, (newLocation) => {
+      if (newLocation && allPosts.size > 0) {
+        // Location has been granted/updated after posts were already loaded.
+        // We need to update distances on existing posts.
+        allPosts.forEach(post => {
+          const restaurant = restaurantsMap.value.get(post.restaurantId);
+          if (restaurant?.location) {
+            post.distance = getDistance(newLocation.lat, newLocation.lng, restaurant.location.lat, restaurant.location.lng);
+          } else {
+            post.distance = null;
+          }
+        });
+        processAndSetPosts(); // Re-sort and update the view
+      }
+    });
+
+    watch(() => props.user, (newUser, oldUser) => {
+      // Re-fetch the feed if the user logs in or out.
+      // The check ensures this doesn't run unnecessarily on initial load
+      // if the user was already logged in.
+      if (newUser?.uid !== oldUser?.uid) {
+        setupFeedListeners();
+      }
     });
 
     watch(loadMoreTrigger, (newValue, oldValue) => {
@@ -121,23 +200,23 @@ export default {
       unsubscribes.length = 0;
       allPosts.clear();
 
-      const bucketListQuery = query(collection(db, 'bucketListItems'), where('userId', '==', auth.currentUser.uid));
-      const unsubBucketList = onSnapshot(bucketListQuery, (snapshot) => {
-        const newBucketList = new Set();
-        snapshot.forEach(doc => newBucketList.add(doc.data().restaurantId));
-        bucketList.value = newBucketList;
-      });
-      unsubscribes.push(unsubBucketList);
-
-      const currentUser = auth.currentUser;
+      const currentUser = props.user;
       if (!currentUser) {
-        loading.value = false;
-        return;
+        bucketList.value.clear();
+      } else {
+        const bucketListQuery = query(collection(db, 'bucketListItems'), where('userId', '==', currentUser.uid));
+        const unsubBucketList = onSnapshot(bucketListQuery, (snapshot) => {
+          const newBucketList = new Set();
+          snapshot.forEach(doc => newBucketList.add(doc.data().restaurantId));
+          bucketList.value = newBucketList;
+        });
+        unsubscribes.push(unsubBucketList);
       }
 
       // Fetch initial data including the leaderboard to avoid race conditions
+      const followsPromise = currentUser ? getDocs(query(collection(db, 'follows'), where('followerId', '==', currentUser.uid))) : Promise.resolve({ docs: [] });
       const [followsSnap, restaurantsSnap, usersSnap, leaderboardSnap] = await Promise.all([
-        getDocs(query(collection(db, 'follows'), where('followerId', '==', currentUser.uid))),
+        followsPromise,
         getDocs(collection(db, 'restaurants')),
         getDocs(collection(db, 'users')),
         getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3)))
@@ -149,31 +228,15 @@ export default {
       });
       leaderboardRanks.value = initialRanks;
 
-      const restaurantsMap = new Map();
+      restaurantsMap.value.clear();
       restaurantsSnap.forEach(doc => {
-        restaurantsMap.set(doc.id, doc.data());
+        restaurantsMap.value.set(doc.id, doc.data());
       });
       
       const usersMap = new Map();
       usersSnap.forEach(doc => {
         usersMap.set(doc.id, doc.data());
       });
-
-      const processAndSetPosts = () => {
-        // Always re-calculate medals before sorting and displaying
-        allPosts.forEach(post => {
-          const rank = leaderboardRanks.value.get(post.userId);
-          post.medal = getMedal(rank);
-        });
-
-        fullSortedPosts.value = Array.from(allPosts.values()).sort((a, b) => {
-            const timeA = a.lastActivityAt || a.createdAt;
-            const timeB = b.lastActivityAt || b.createdAt;
-            return timeB.seconds - timeA.seconds;
-        });
-        // Update the displayed posts, preserving the current scroll length
-        posts.value = fullSortedPosts.value.slice(0, posts.value.length || pageSize);
-      };
 
       const leaderboardQuery = query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3));
       const unsubLeaderboard = onSnapshot(leaderboardQuery, (leaderboardSnap) => {
@@ -192,13 +255,15 @@ export default {
             allPosts.delete(change.doc.id);
           } else {
             const docData = change.doc.data();
-            const restaurant = restaurantsMap.get(docData.restaurantId);
+            const restaurant = restaurantsMap.value.get(docData.restaurantId);
             const user = usersMap.get(docData.userId);
             const rank = leaderboardRanks.value.get(docData.userId); // Now guaranteed to have initial ranks
             const post = {
               ...docData,
               id: change.doc.id,
               restaurantName: restaurant?.name || 'Unknown Restaurant',
+              restaurantCity: restaurant?.city,
+              restaurantState: restaurant?.state,
               location: restaurant?.location || null,
               distance: userLocation.value && restaurant?.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null,
               userName: user?.displayName || 'Unknown User',
@@ -212,42 +277,51 @@ export default {
         loading.value = false;
       };
 
-      const followingIds = followsSnap.docs.map(doc => doc.data().followingId);
-
-      // Add current user's ID to see their own posts
-      if (!followingIds.includes(currentUser.uid)) {
-        followingIds.push(currentUser.uid);
-      }
-
-      if (followingIds.length > 0) {
-        // Firestore 'in' query is limited to 30 elements, so we batch
-        for (let i = 0; i < followingIds.length; i += 30) {
-            const batchIds = followingIds.slice(i, i + 30);
-            const q = query(collection(db, 'reviews'), where('userId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
-            const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (followed):", error));
-            unsubscribes.push(unsub);
+      if (currentUser) {
+        // --- LOGGED-IN USER LOGIC ---
+        const followingIds = followsSnap.docs.map(doc => doc.data().followingId);
+        // Add current user's ID to see their own posts
+        if (!followingIds.includes(currentUser.uid)) {
+          followingIds.push(currentUser.uid);
         }
-      }
-
-      if (userLocation.value) {
-        const nearbyRestaurantIds = [];
-        restaurantsSnap.forEach(doc => {
-          const restaurant = doc.data();
-          if (restaurant.location) {
-            const distance = getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng);
-            if (distance !== null && distance <= 100) {
-              nearbyRestaurantIds.push(doc.id);
-            }
+        if (followingIds.length > 0) {
+          // Firestore 'in' query is limited to 30 elements, so we batch
+          for (let i = 0; i < followingIds.length; i += 30) {
+              const batchIds = followingIds.slice(i, i + 30);
+              const q = query(collection(db, 'reviews'), where('userId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
+              const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (followed):", error));
+              unsubscribes.push(unsub);
           }
-        });
-        if (nearbyRestaurantIds.length > 0) {
-            for (let i = 0; i < nearbyRestaurantIds.length; i += 30) {
-                const batchIds = nearbyRestaurantIds.slice(i, i + 30);
-                const q = query(collection(db, 'reviews'), where('restaurantId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
-                const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (nearby):", error));
-                unsubscribes.push(unsub);
-            }
         }
+
+        if (userLocation.value) {
+          const nearbyRestaurantIds = [];
+          restaurantsSnap.forEach(doc => {
+            const restaurant = doc.data();
+            if (restaurant.location) {
+              const distance = getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng);
+              if (distance !== null && distance <= 100) {
+                nearbyRestaurantIds.push(doc.id);
+              }
+            }
+          });
+          if (nearbyRestaurantIds.length > 0) {
+              for (let i = 0; i < nearbyRestaurantIds.length; i += 30) {
+                  const batchIds = nearbyRestaurantIds.slice(i, i + 30);
+                  const q = query(collection(db, 'reviews'), where('restaurantId', 'in', batchIds), orderBy('lastActivityAt', 'desc'));
+                  const unsub = onSnapshot(q, processSnapshot, (error) => console.error("Feed error (nearby):", error));
+                  unsubscribes.push(unsub);
+              }
+          }
+        }
+      } else {
+        // --- GUEST USER LOGIC ---
+        // Fetch a pool of the 50 most recent reviews globally.
+        // The sorting function will then correctly order them by distance if location is available,
+        // or by time if not.
+        const recentReviewsQuery = query(collection(db, 'reviews'), orderBy('lastActivityAt', 'desc'), limit(50));
+        const unsub = onSnapshot(recentReviewsQuery, processSnapshot, (error) => console.error("Feed error (recent for guests):", error));
+        unsubscribes.push(unsub);
       }
 
       if (unsubscribes.length === 0) {
@@ -277,11 +351,9 @@ export default {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
-          setupFeedListeners();
         },
         () => {
           locationPermission.value = 'denied';
-          setupFeedListeners(); // Fetch feed without location
         },
         { timeout: 10000 }
       );
@@ -305,15 +377,23 @@ export default {
         };
 
         if (permissionStatus.state === 'granted') {
+          // Asynchronously request location. Don't wait for it.
           requestLocationAccess();
-        } else {
-          setupFeedListeners();
         }
       } catch (error) {
         console.error("Error checking location permission:", error);
         // If permission query fails (e.g. in Firefox private mode), fallback to just asking.
         requestLocationAccess();
+      } finally {
+        // ALWAYS set up the feed listeners after checking permission.
+        setupFeedListeners();
       }
+    };
+
+    const setSortOrder = (order) => {
+      if (sortOrder.value === order) return;
+      sortOrder.value = order;
+      processAndSetPosts();
     };
 
     const getMedal = (index) => {
@@ -329,7 +409,7 @@ export default {
     };
 
     const toggleBucketList = async (post) => {
-      const currentUser = auth.currentUser;
+      const currentUser = props.user;
       if (!currentUser) return;
 
       if (isInBucketList(post.restaurantId)) {
@@ -345,8 +425,6 @@ export default {
       }
     };
 
-    onMounted(checkLocationPermission);
-
     return {
       posts,
       loading,
@@ -355,7 +433,10 @@ export default {
       loadMoreTrigger,
       loadingMore,
       isInBucketList,
-      toggleBucketList
+      toggleBucketList,
+      userLocation,
+      sortOrder,
+      setSortOrder
     };
   }
 };
@@ -404,6 +485,35 @@ export default {
   cursor: pointer;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.sort-toggle {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5em;
+  background-color: #e9ecef;
+  border-radius: 8px;
+  padding: 4px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sort-toggle button {
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 500;
+  color: var(--secondary-color);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sort-toggle button.active {
+  background-color: white;
+  color: var(--primary-color);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .loading-indicator, .no-posts-message {
@@ -479,20 +589,26 @@ export default {
 }
 
 .post-content {
-  padding: 1.5em;
+  padding: 0.5em 1.5em 1.5em;
 }
 
 .post-title-line {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 1em;
+  margin-bottom: 0.25em;
 }
 
 .restaurant-name {
-  font-size: 1.2em;
+  font-size: 1.1em;
   font-weight: 600;
   margin: 0;
+}
+
+.restaurant-location {
+  font-size: 0.9em;
+  color: #777;
+  margin-bottom: 0.75em;
 }
 
 .restaurant-title-group {

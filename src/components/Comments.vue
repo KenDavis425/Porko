@@ -25,16 +25,19 @@
         </div>
       </div>
     </div>
-    <div class="add-comment">
+    <div v-if="user" class="add-comment">
       <input v-model="newComment" placeholder="Add a comment..." @keyup.enter="addComment" />
       <button @click="addComment" :disabled="!newComment.trim()">Post</button>
+    </div>
+    <div v-else class="add-comment-login-prompt">
+      <p>Please log in to comment.</p>
     </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { db, auth } from '../firebase';
+import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, documentId } from 'firebase/firestore';
 
 export default {
@@ -43,6 +46,10 @@ export default {
     postId: { type: String, required: true },
     postType: { type: String, required: true },
     postAuthorId: { type: String, required: true },
+    user: {
+      type: Object,
+      default: null
+    }
   },
   setup(props) {
     const comments = ref([]);
@@ -52,7 +59,9 @@ export default {
     let unsubscribe = () => {};
 
     onMounted(() => {
-      const commentsCollection = collection(db, props.postType, props.postId, 'comments');
+      // Use a DocumentReference for the parent, then get the subcollection correctly.
+      const parentDocRef = doc(db, props.postType, props.postId);
+      const commentsCollection = collection(parentDocRef, 'comments');
       const commentsQuery = query(commentsCollection, orderBy('createdAt', 'asc'));
       unsubscribe = onSnapshot(commentsQuery, async (snapshot) => {
         const commentData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -89,11 +98,12 @@ export default {
 
     const addComment = async () => {
       if (newComment.value.trim() === '') return;
-      const currentUser = auth.currentUser;
+      const currentUser = props.user;
       if (!currentUser) return;
 
       const now = serverTimestamp();
-      const commentsCollection = collection(db, props.postType, props.postId, 'comments');
+      const parentDocRef = doc(db, props.postType, props.postId);
+      const commentsCollection = collection(parentDocRef, 'comments');
       const reviewDocRef = doc(db, 'reviews', props.postId);
 
       await Promise.all([
@@ -108,12 +118,12 @@ export default {
     };
 
     const canEdit = (comment) => {
-      const currentUser = auth.currentUser;
+      const currentUser = props.user;
       return currentUser && currentUser.uid === comment.userId;
     };
 
     const canDelete = (comment) => {
-      const currentUser = auth.currentUser;
+      const currentUser = props.user;
       return currentUser && (currentUser.uid === comment.userId || currentUser.uid === props.postAuthorId);
     };
 
@@ -129,7 +139,9 @@ export default {
 
     const saveEdit = async () => {
       if (editingText.value.trim() === '' || !editingCommentId.value) return;
-      const commentDoc = doc(db, props.postType, props.postId, 'comments', editingCommentId.value);
+      const parentDocRef = doc(db, props.postType, props.postId);
+      const commentsCollection = collection(parentDocRef, 'comments');
+      const commentDoc = doc(commentsCollection, editingCommentId.value);
       const reviewDocRef = doc(db, 'reviews', props.postId);
       await Promise.all([
         updateDoc(commentDoc, { text: editingText.value }),
@@ -140,7 +152,9 @@ export default {
 
     const deleteComment = async (commentId) => {
       if (confirm('Are you sure you want to delete this comment?')) {
-        const commentDoc = doc(db, props.postType, props.postId, 'comments', commentId);
+        const parentDocRef = doc(db, props.postType, props.postId);
+        const commentsCollection = collection(parentDocRef, 'comments');
+        const commentDoc = doc(commentsCollection, commentId);
         const reviewDocRef = doc(db, 'reviews', props.postId);
         await Promise.all([
           deleteDoc(commentDoc),
@@ -189,4 +203,9 @@ export default {
 .add-comment button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
 .btn-primary { background-color: var(--primary-color); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
 .btn-secondary { background-color: #ecf0f1; color: var(--secondary-color); border: 1px solid #bdc3c7; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+.add-comment-login-prompt {
+  text-align: center;
+  color: #777;
+  font-size: 0.9em;
+}
 </style>

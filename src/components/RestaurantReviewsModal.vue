@@ -6,27 +6,48 @@
         <button @click="$emit('close')" class="close-btn">&times;</button>
       </div>
       <div class="modal-body">
-        <div v-if="loading" class="loading-indicator">Loading reviews...</div>
-        <div v-else-if="reviews.length === 0" class="no-reviews-message">
+        <div v-if="restaurant.reviews && restaurant.reviews.length === 0" class="no-reviews-message">
           No reviews yet for this restaurant.
         </div>
         <ul v-else class="reviews-list">
-          <li v-for="review in reviews" :key="review.id" class="review-item">
-            <div class="review-header">
-              <img :src="review.userPhoto || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" alt="User" class="user-avatar" />
-              <div class="user-info">
-                <span class="user-name">{{ review.userName }}</span>
-                <span class="review-date">{{ formatDate(review.createdAt) }}</span>
+          <li v-for="review in restaurant.reviews" :key="review.id" class="review-item">
+            <div v-if="editingReview && editingReview.id === review.id">
+              <!-- Edit Form -->
+              <div class="edit-review-form">
+                <StarRating :rating="editingReview.rating" :editable="true" @update:rating="newVal => editingReview.rating = newVal" />
+                <textarea v-model="editingReview.text" class="edit-textarea"></textarea>
+                <div class="edit-actions">
+                  <button @click="saveEdit" class="btn-primary">Save</button>
+                  <button @click="cancelEdit" class="btn-secondary">Cancel</button>
+                </div>
               </div>
             </div>
-            <div class="review-body">
-              <StarRating :rating="review.rating" />
-              <p v-if="review.text" class="review-text">"{{ review.text }}"</p>
-              <div v-if="review.photoURL" class="review-photo-container">
-                <img :src="review.photoURL" alt="Review photo" class="review-photo" />
+            <div v-else>
+              <!-- Display Review -->
+              <div class="review-header">
+                <img :src="review.userPhoto || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" alt="User" class="user-avatar" />
+                <div class="user-info">
+                  <span class="user-name">{{ review.userName }}</span>
+                  <span class="review-date">{{ formatDate(review.createdAt) }}</span>
+                </div>
+                <div class="review-actions" v-if="user && user.uid === review.userId">
+                  <button @click="startEditing(review)" class="action-btn" title="Edit Review">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                  </button>
+                  <button @click="deleteReview(review.id)" class="action-btn" title="Delete Review">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                  </button>
+                </div>
               </div>
-              <div v-if="review.tags && review.tags.length > 0" class="tags-container">
-                <span v-for="tag in review.tags" :key="tag" class="tag">{{ tag }}</span>
+              <div class="review-body">
+                <StarRating :rating="review.rating" />
+                <p v-if="review.text" class="review-text">"{{ review.text }}"</p>
+                <div v-if="review.photoURL" class="review-photo-container">
+                  <img :src="review.photoURL" alt="Review photo" class="review-photo" />
+                </div>
+                <div v-if="review.tags && review.tags.length > 0" class="tags-container">
+                  <span v-for="tag in review.tags" :key="tag" class="tag">{{ tag }}</span>
+                </div>
               </div>
             </div>
           </li>
@@ -37,9 +58,9 @@
 </template>
 
 <script>
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 
 export default {
@@ -49,87 +70,64 @@ export default {
     restaurant: {
       type: Object,
       required: true
+    },
+    user: {
+      type: Object,
+      default: null
     }
   },
-  emits: ['close'],
-  setup(props) {
-    const reviews = ref([]);
-    const loading = ref(true);
-
-    const fetchReviewsForRestaurant = async () => {
-      if (!props.restaurant?.id) return;
-      console.log(`Fetching reviews for restaurant ID: ${props.restaurant.id}`);
-      loading.value = true;
-      reviews.value = [];
-      try {
-        const reviewsQuery = query(
-          collection(db, 'reviews'),
-          where('restaurantId', '==', props.restaurant.id),
-          orderBy('createdAt', 'desc')
-        );
-        const reviewsSnapshot = await getDocs(reviewsQuery);
-        console.log(`Found ${reviewsSnapshot.size} reviews for restaurant ${props.restaurant.id}.`);
-        const reviewData = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        if (reviewData.length === 0) {
-          reviews.value = [];
-          loading.value = false;
-          return;
-        }
-
-        const userIds = [...new Set(reviewData.map(r => r.userId))];
-        const usersMap = new Map();
-
-        // Firestore 'in' queries are limited to 30 elements.
-        // Batch the user ID fetches to handle more than 30 reviews.
-        const userPromises = [];
-        for (let i = 0; i < userIds.length; i += 30) {
-          const batchIds = userIds.slice(i, i + 30);
-          if (batchIds.length > 0) {
-            const usersQuery = query(collection(db, 'users'), where('uid', 'in', batchIds));
-            userPromises.push(getDocs(usersQuery));
-          }
-        }
-
-        const userSnapshots = await Promise.all(userPromises);
-        userSnapshots.forEach(snapshot => {
-          snapshot.forEach(doc => {
-            const userData = doc.data();
-            usersMap.set(userData.uid, userData);
-          });
-        });
-
-        reviews.value = reviewData.map(review => {
-          const user = usersMap.get(review.userId);
-          return {
-            ...review,
-            userName: user?.displayName || 'Unknown User',
-            userPhoto: user?.photoURL || null
-          };
-        });
-      } catch (error) {
-        console.error("Error fetching reviews for restaurant:", error);
-        console.error("Error fetching reviews:", error);
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    watch(() => props.restaurant, (newRestaurant) => {
-      if (newRestaurant) {
-        fetchReviewsForRestaurant();
-      }
-    }, { immediate: true });
+  emits: ['close', 'reviews-updated'],
+  setup(props, { emit }) {
+    const editingReview = ref(null);
 
     const formatDate = (timestamp) => {
       if (!timestamp || !timestamp.toDate) return '';
       return timestamp.toDate().toLocaleDateString();
     };
 
+    const startEditing = (review) => {
+      editingReview.value = JSON.parse(JSON.stringify(review));
+    };
+
+    const cancelEdit = () => {
+      editingReview.value = null;
+    };
+
+    const saveEdit = async () => {
+      if (!editingReview.value) return;
+      const reviewRef = doc(db, 'reviews', editingReview.value.id);
+      try {
+        await updateDoc(reviewRef, {
+          rating: editingReview.value.rating,
+          text: editingReview.value.text
+        });
+        emit('reviews-updated');
+        cancelEdit();
+      } catch (error) {
+        console.error("Error updating review:", error);
+        alert("Failed to save review. Please try again.");
+      }
+    };
+
+    const deleteReview = async (reviewId) => {
+      if (confirm("Are you sure you want to delete this review?")) {
+        try {
+          await deleteDoc(doc(db, 'reviews', reviewId));
+          emit('reviews-updated');
+        } catch (error) {
+          console.error("Error deleting review:", error);
+          alert("Failed to delete review. Please try again.");
+        }
+      }
+    };
+
     return {
-      reviews,
-      loading,
-      formatDate
+      formatDate,
+      editingReview,
+      startEditing,
+      cancelEdit,
+      saveEdit,
+      deleteReview
     };
   }
 };
@@ -146,7 +144,7 @@ export default {
 .reviews-list { list-style: none; padding: 0; margin: 0; }
 .review-item { border-bottom: 1px solid #eee; padding: 1.5em 0; }
 .review-item:last-child { border-bottom: none; }
-.review-header { display: flex; align-items: center; gap: 1em; margin-bottom: 1em; }
+.review-header { display: flex; align-items: center; gap: 1em; margin-bottom: 1em; position: relative; }
 .user-avatar { width: 40px; height: 40px; border-radius: 50%; }
 .user-info { display: flex; flex-direction: column; }
 .user-name { font-weight: 600; }
@@ -157,4 +155,26 @@ export default {
 .review-photo { max-width: 100%; max-height: 300px; border-radius: 8px; }
 .tags-container { margin-top: 1em; display: flex; flex-wrap: wrap; gap: 0.5em; }
 .tag { background-color: #ecf0f1; color: var(--secondary-color); padding: 4px 10px; border-radius: 15px; font-size: 0.85em; }
+.review-actions { margin-left: auto; display: flex; gap: 0.5em; }
+.action-btn { background: none; border: none; cursor: pointer; color: #777; padding: 4px; }
+.action-btn:hover { color: #333; }
+.edit-review-form { display: flex; flex-direction: column; gap: 1em; }
+.edit-textarea { width: 100%; min-height: 80px; border: 1px solid #ccc; border-radius: 8px; padding: 10px; font-family: inherit; }
+.edit-actions { display: flex; justify-content: flex-end; gap: 0.5em; }
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-secondary {
+  background-color: #ecf0f1;
+  color: #34495e;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
 </style>
