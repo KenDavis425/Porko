@@ -43,7 +43,7 @@
                 <StarRating :rating="review.rating" />
                 <p v-if="review.text" class="review-text">"{{ review.text }}"</p>
                 <div v-if="review.photoURL" class="review-photo-container">
-                  <img :src="review.photoURL" alt="Review photo" class="review-photo" />
+                  <img :src="review.photoURL" alt="Review photo" class="review-photo" loading="lazy" />
                 </div>
                 <div v-if="review.tags && review.tags.length > 0" class="tags-container">
                   <span v-for="tag in review.tags" :key="tag" class="tag">{{ tag }}</span>
@@ -62,6 +62,7 @@ import { ref } from 'vue';
 import { db } from '../firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
+import { showToast } from '../utils/toast.js';
 
 export default {
   name: 'RestaurantReviewsModal',
@@ -103,9 +104,10 @@ export default {
         });
         emit('reviews-updated');
         cancelEdit();
+        showToast('Review updated successfully!', 'success');
       } catch (error) {
         console.error("Error updating review:", error);
-        alert("Failed to save review. Please try again.");
+        showToast("Failed to save review. Please try again.", 'error');
       }
     };
 
@@ -114,9 +116,10 @@ export default {
         try {
           await deleteDoc(doc(db, 'reviews', reviewId));
           emit('reviews-updated');
+          showToast('Review deleted successfully', 'success');
         } catch (error) {
           console.error("Error deleting review:", error);
-          alert("Failed to delete review. Please try again.");
+          showToast("Failed to delete review. Please try again.", 'error');
         }
       }
     };

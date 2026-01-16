@@ -100,6 +100,7 @@
         :user="user"
         @close="closeReviewModal"
       />
+      <Toast />
     </div>
   </div>
 </template>
@@ -117,6 +118,8 @@ import Followers from './components/Followers.vue';
 import BucketList from './components/BucketList.vue';
 import Following from './components/Following.vue';
 import ReviewDetailModal from './components/ReviewDetailModal.vue';
+import Toast from './components/Toast.vue';
+import { resetMetaTags } from './utils/meta.js';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, provider, signInWithPopup, signOut, db } from './firebase';
@@ -136,7 +139,8 @@ export default {
     Leaderboard,
     Followers,
     Following,
-    ReviewDetailModal
+    ReviewDetailModal,
+    Toast
   },
   setup() {
     const user = ref(null);
@@ -267,21 +271,37 @@ export default {
     };
 
     const handleDeepLink = () => {
-      // Check for review deep link: #review/{reviewId}
+      // Check for new format: /review/{reviewId}
+      const pathMatch = window.location.pathname.match(/\/review\/([^\/]+)/);
+      if (pathMatch) {
+        const reviewId = pathMatch[1];
+        if (reviewId) {
+          sharedReviewId.value = reviewId;
+          currentPage.value = 'home';
+          // Clean up URL without reloading
+          window.history.replaceState(null, '', '/');
+          return;
+        }
+      }
+      
+      // Check for old hash format: #review/{reviewId} (for backward compatibility)
       const hash = window.location.hash;
       const reviewMatch = hash.match(/#review\/([^/]+)/);
       if (reviewMatch) {
         const reviewId = reviewMatch[1];
-        sharedReviewId.value = reviewId;
-        // Navigate to home so sidebar works correctly
-        currentPage.value = 'home';
-        // Clear the hash to avoid showing it again on reload
-        window.location.hash = '';
+        if (reviewId) {
+          sharedReviewId.value = reviewId;
+          // Navigate to home so sidebar works correctly
+          currentPage.value = 'home';
+          // Update to new URL format
+          window.history.replaceState(null, '', `/review/${reviewId}`);
+        }
       }
     };
 
     const closeReviewModal = () => {
       sharedReviewId.value = null;
+      resetMetaTags();
     };
 
     onMounted(() => {

@@ -44,6 +44,7 @@ import { db, storage } from '../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import StarRating from './StarRating.vue';
+import { showToast } from '../utils/toast.js';
 
 export default {
   name: 'AddReviewModal',
@@ -162,13 +163,19 @@ export default {
         // Update the user's reviewCount atomically
         // Using increment() ensures thread-safe updates and handles the case where reviewCount doesn't exist yet
         const userRef = doc(db, 'users', props.user.uid);
-        await updateDoc(userRef, { reviewCount: increment(1) });
+        try {
+          await updateDoc(userRef, { reviewCount: increment(1) });
+        } catch (countError) {
+          console.warn("Failed to update reviewCount (non-critical):", countError);
+        }
         
+        showToast('Review added successfully!', 'success', 2000);
         emit('review-added', props.restaurantId);
       } catch (e) {
         if (!error.value) { // Don't overwrite upload-specific error
           console.error("Error submitting review:", e);
           error.value = "Failed to submit review. Please try again.";
+          showToast("Failed to submit review. Please try again.", 'error');
         }
         isUploading.value = false;
       }

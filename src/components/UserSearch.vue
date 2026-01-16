@@ -8,8 +8,14 @@
     <div v-if="loading">Loading users...</div>
     <div v-else>
       <div v-if="filteredUsers.length === 0" class="no-users-message">
-        <span v-if="searchQuery">No users found matching your search.</span>
-        <span v-else>No other users found.</span>
+        <div v-if="searchQuery">
+          <h3>No users found</h3>
+          <p>Try adjusting your search terms or check out the Leaderboard to find active reviewers.</p>
+        </div>
+        <div v-else>
+          <h3>No other users yet</h3>
+          <p>Be the first to share reviews! Create your first review and invite others to join.</p>
+        </div>
       </div>
       <div v-for="user in filteredUsers" :key="user.uid" class="user-card">
         <div class="user-card-content">
@@ -287,7 +293,20 @@ export default {
 .no-users-message {
   text-align: center;
   color: #777;
-  padding: 2em;
+  padding: 3em 2em;
+  background: var(--card-background);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px var(--shadow-color);
+}
+
+.no-users-message h3 {
+  margin: 0 0 0.5em 0;
+  color: var(--text-color);
+}
+
+.no-users-message p {
+  margin: 0;
+  font-size: 0.95em;
 }
 
 .user-card {

@@ -4,7 +4,8 @@
     <div v-if="loading" class="loading-indicator">Loading followers...</div>
     <div v-else>
       <div v-if="followers.length === 0" class="no-followers-message">
-        <span>No one is following you yet.</span>
+        <h3>No followers yet</h3>
+        <p>Start sharing reviews to attract followers! The more you review, the more visible you'll be.</p>
       </div>
       <div v-for="user in followers" :key="user.uid" class="user-card">
         <div class="user-card-content">
@@ -171,7 +172,24 @@ export default {
 
 <style scoped>
 .followers-page { max-width: 800px; margin: 0 auto; }
-.loading-indicator, .no-followers-message { text-align: center; color: #777; padding: 2em; }
+.loading-indicator, .no-followers-message { 
+  text-align: center; 
+  color: #777; 
+  padding: 3em 2em;
+  background: var(--card-background);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px var(--shadow-color);
+}
+
+.no-followers-message h3 {
+  margin: 0 0 0.5em 0;
+  color: var(--text-color);
+}
+
+.no-followers-message p {
+  margin: 0;
+  font-size: 0.95em;
+}
 .user-card { display: flex; align-items: center; justify-content: space-between; background: var(--card-background); padding: 1.5em; border-radius: 12px; box-shadow: 0 4px 15px var(--shadow-color); margin-bottom: 1.5em; gap: 1.5em; }
 .user-card-content { flex-grow: 1; }
 .user-info { display: flex; align-items: center; gap: 1em; }

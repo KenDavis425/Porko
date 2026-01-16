@@ -4,7 +4,8 @@
     <div v-if="loading" class="loading-indicator">Loading users you follow...</div>
     <div v-else>
       <div v-if="following.length === 0" class="no-users-message">
-        <span>You are not following anyone yet.</span>
+        <h3>Not following anyone yet</h3>
+        <p>Visit the "Follow Users" page to discover and follow other reviewers to see their posts in your feed.</p>
       </div>
       <div v-for="user in following" :key="user.uid" class="user-card">
         <div class="user-card-content">
@@ -47,6 +48,7 @@ import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, doc, deleteDoc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 import UserReviewsModal from './UserReviewsModal.vue';
+import { showToast } from '../utils/toast.js';
 
 const getMedal = (index) => {
   // Medals are assigned based on position (0-indexed)
@@ -171,10 +173,11 @@ export default {
         if (!querySnapshot.empty) {
           const docId = querySnapshot.docs[0].id;
           await deleteDoc(doc(db, 'follows', docId));
+          showToast(`Unfollowed ${userToUnfollow.displayName}`, 'success');
         }
       } catch (error) {
         console.error("Error unfollowing user:", error);
-        alert("Failed to unfollow user. Please try again.");
+        showToast("Failed to unfollow user. Please try again.", 'error');
       }
     };
 

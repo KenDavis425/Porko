@@ -21,7 +21,7 @@
       @reviews-updated="handleReviewOrUpdate"
     />
     <div class="search-box">
-      <input type="text" v-model="searchQuery" placeholder="Search by name, address, city, state, or zip..." class="search-input" />
+      <input type="text" v-model="searchQuery" placeholder="Search by name, address, city, state, or zip..." class="search-input" aria-label="Search restaurants" />
     </div>
     <div v-if="user" class="add-restaurant-container">
       <button @click="showAddForm = !showAddForm" class="btn-toggle-add">
@@ -105,6 +105,7 @@ import EditRestaurantModal from './EditRestaurantModal.vue';
 import AddReviewModal from './AddReviewModal.vue';
 import RestaurantReviewsModal from './RestaurantReviewsModal.vue'; 
 import { getDistance } from '../utils/geolocation.js';
+import { showToast } from '../utils/toast.js';
 
 export default {
   name: 'Restaurants',
@@ -343,7 +344,7 @@ export default {
         if (location) {
           dataToSave.location = location;
         } else {
-          alert("Could not find a location for the provided address. Please check the address and try again. The restaurant will be saved without a location.");
+          showToast("Could not find a location for the provided address. The restaurant will be saved without a location.", 'warning', 5000);
           dataToSave.location = null;
         }
       }
@@ -363,7 +364,7 @@ export default {
         closeEditModal();
       } catch (error) {
         console.error("Error updating restaurant: ", error);
-        alert("Failed to save changes. Please try again.");
+        showToast("Failed to save changes. Please try again.", 'error');
       }
     };
 

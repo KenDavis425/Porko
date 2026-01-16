@@ -5,6 +5,12 @@
         <button @click="showCompleted = false" :class="{ active: !showCompleted }">To Try</button>
         <button @click="showCompleted = true" :class="{ active: showCompleted }">Completed</button>
       </div>
+      <div v-if="filteredItems.length > 0 && selectedItems.size > 0" class="batch-actions">
+        <span>{{ selectedItems.size }} item(s) selected</span>
+        <button @click="removeSelectedItems" class="btn-delete-batch">Remove Selected</button>
+        <button @click="selectedItems.clear()" class="btn-cancel-selection">Cancel</button>
+      </div>
+      <button v-else-if="filteredItems.length > 0" @click="selectAll" class="btn-select-all">Select All</button>
     </div>
     <div v-if="!currentUser" class="no-items-message">
       <p>Please log in to view your bucket list.</p>
@@ -15,7 +21,10 @@
       <p v-else>You haven't completed any bucket list items yet.</p>
     </div>
     <div v-else class="restaurant-list">
-      <div v-for="item in filteredItems" :key="item.id" class="restaurant-item">
+      <div v-for="item in filteredItems" :key="item.id" class="restaurant-item" :class="{ 'selected': selectedItems.has(item.id) }">
+        <div v-if="selectedItems.size > 0" class="item-checkbox">
+          <input type="checkbox" :checked="selectedItems.has(item.id)" @change="toggleItemSelection(item.id)" />
+        </div>
         <!-- Restaurant details, similar to Restaurants.vue -->
         <div class="restaurant-details">
             <span class="restaurant-name">{{ item.restaurant.name }}</span>
@@ -47,6 +56,7 @@ import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, doc, deleteDoc, documentId } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 import { getDistance } from '../utils/geolocation.js';
+import { showToast } from '../utils/toast.js';
 
 export default {
   name: 'BucketList',
@@ -58,6 +68,7 @@ export default {
     const showCompleted = ref(false);
     const userLocation = ref(null);
     const currentUser = ref(auth.currentUser);
+    const selectedItems = ref(new Set());
     let unsubscribe = () => {};
 
     // Watch for auth state changes
@@ -191,7 +202,44 @@ export default {
 
     const removeFromBucketList = async (itemId) => {
       if (confirm('Are you sure you want to remove this from your bucket list?')) {
-        await deleteDoc(doc(db, 'bucketListItems', itemId));
+        try {
+          await deleteDoc(doc(db, 'bucketListItems', itemId));
+          showToast('Removed from bucket list', 'success');
+        } catch (error) {
+          console.error('Error removing from bucket list:', error);
+          showToast('Failed to remove item. Please try again.', 'error');
+        }
+      }
+    };
+
+    const toggleItemSelection = (itemId) => {
+      if (selectedItems.value.has(itemId)) {
+        selectedItems.value.delete(itemId);
+      } else {
+        selectedItems.value.add(itemId);
+      }
+    };
+
+    const selectAll = () => {
+      filteredItems.value.forEach(item => {
+        selectedItems.value.add(item.id);
+      });
+    };
+
+    const removeSelectedItems = async () => {
+      if (selectedItems.value.size === 0) return;
+      if (!confirm(`Are you sure you want to remove ${selectedItems.value.size} item(s) from your bucket list?`)) return;
+      
+      try {
+        const deletePromises = Array.from(selectedItems.value).map(itemId => 
+          deleteDoc(doc(db, 'bucketListItems', itemId))
+        );
+        await Promise.all(deletePromises);
+        showToast(`Removed ${selectedItems.value.size} item(s) from bucket list`, 'success');
+        selectedItems.value.clear();
+      } catch (error) {
+        console.error('Error removing items:', error);
+        showToast('Failed to remove items. Please try again.', 'error');
       }
     };
 
@@ -209,7 +257,11 @@ export default {
       loading,
       showCompleted,
       filteredItems,
+      selectedItems,
       removeFromBucketList,
+      toggleItemSelection,
+      selectAll,
+      removeSelectedItems,
       getDirectionsUrl,
       getDetailsUrl,
       currentUser
@@ -228,7 +280,46 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1em;
   margin-bottom: 2em;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+}
+
+.btn-delete-batch,
+.btn-cancel-selection,
+.btn-select-all {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.btn-delete-batch {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.btn-delete-batch:hover {
+  background-color: #c0392b;
+}
+
+.btn-cancel-selection,
+.btn-select-all {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.btn-cancel-selection:hover,
+.btn-select-all:hover {
+  background-color: #7f8c8d;
 }
 .view-toggle button {
   background: none;
@@ -269,6 +360,22 @@ export default {
   border-radius: 12px;
   box-shadow: 0 4px 15px var(--shadow-color);
   margin-bottom: 1.5em;
+  transition: all 0.2s;
+}
+
+.restaurant-item.selected {
+  background: rgba(52, 152, 219, 0.1);
+  border: 2px solid #3498db;
+}
+
+.item-checkbox {
+  margin-right: 1em;
+}
+
+.item-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
 }
 .restaurant-details {
   display: flex;

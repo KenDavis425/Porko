@@ -119,11 +119,32 @@
         <div class="form-group">
           <label for="comment">Comment</label>
           <textarea id="comment" v-model="comment" rows="4" placeholder="How was the tenderloin?"></textarea>
+          <span v-if="comment.length > 0" class="char-count">{{ comment.length }} characters</span>
         </div>
 
-        <button type="submit" :disabled="submitting || !selectedRestaurant || !rating">
-          {{ submitting ? 'Submitting...' : 'Submit Review' }}
-        </button>
+        <div v-if="showPreview && selectedRestaurant && rating" class="review-preview">
+          <h3>Preview</h3>
+          <div class="preview-content">
+            <div class="preview-restaurant">{{ getRestaurantName(selectedRestaurant) }}</div>
+            <StarRating :rating="rating" />
+            <p v-if="comment">{{ comment }}</p>
+            <div v-if="selectedTags.length > 0" class="tags-container">
+              <span v-for="tag in selectedTags" :key="tag" class="tag">{{ tag }}</span>
+            </div>
+            <div v-if="photoDataUrl" class="photo-preview">
+              <img :src="photoDataUrl" alt="Review photo preview" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" @click="showPreview = !showPreview" class="btn-secondary" v-if="selectedRestaurant && rating">
+            {{ showPreview ? 'Hide Preview' : 'Preview Review' }}
+          </button>
+          <button type="submit" :disabled="submitting || !selectedRestaurant || !rating">
+            {{ submitting ? 'Submitting...' : 'Submit Review' }}
+          </button>
+        </div>
         <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
       </form>
     </div>
@@ -136,6 +157,7 @@ import { collection, getDocs, addDoc, serverTimestamp, query, orderBy, where, do
 import { getDistance } from '../utils/geolocation.js';
 import { geocodeAddress } from '../utils/geocoding.js';
 import { getStorage, ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { showToast } from '../utils/toast.js';
 
 export default {
   name: 'Review',
@@ -167,6 +189,7 @@ export default {
     const stream = ref(null);
     const fileInput = ref(null);
     const userLocation = ref(null);
+    const showPreview = ref(false);
 
     // SVG paths for stars
     const fullStarPath = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z";
@@ -247,6 +270,11 @@ export default {
     const getStarPath = (starIndex) => {
       const displayRating = hoverRating.value || rating.value;
       return displayRating >= starIndex ? fullStarPath : emptyStarPath;
+    };
+
+    const getRestaurantName = (restaurantId) => {
+      const restaurant = restaurants.value.find(r => r.id === restaurantId);
+      return restaurant?.name || 'Selected Restaurant';
     };
 
     const toggleTag = (tagName) => {
@@ -469,10 +497,14 @@ export default {
           // Don't fail the entire submission if bucket list update fails
         }
 
+        showToast('Review submitted successfully!', 'success', 2000);
+        // Small delay to show success message before navigation
+        await new Promise(resolve => setTimeout(resolve, 500));
         emit('reviewed');
       } catch (error) {
         console.error("Error submitting check-in: ", error);
         errorMessage.value = "Failed to submit check-in. Please try again.";
+        showToast("Failed to submit check-in. Please try again.", 'error');
       } finally {
         submitting.value = false;
       }
@@ -504,7 +536,9 @@ export default {
       openCamera, closeCamera, capturePhoto, removePhoto,
       fileInput,
       triggerFileUpload,
-      handleFileUpload
+      handleFileUpload,
+      showPreview,
+      getRestaurantName
     };
   }
 };
@@ -682,6 +716,59 @@ export default {
   background-color: var(--primary-color);
   color: white;
   border-color: var(--primary-color);
+}
+.char-count {
+  font-size: 0.85em;
+  color: #777;
+  margin-top: 0.25em;
+  display: block;
+}
+.review-preview {
+  background: var(--card-background);
+  border: 2px solid var(--primary-color);
+  border-radius: 8px;
+  padding: 1.5em;
+  margin: 1.5em 0;
+}
+.review-preview h3 {
+  margin: 0 0 1em 0;
+  color: var(--primary-color);
+}
+.preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75em;
+}
+.preview-restaurant {
+  font-weight: 600;
+  font-size: 1.1em;
+  color: var(--text-color);
+}
+.photo-preview {
+  margin-top: 0.5em;
+}
+.photo-preview img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+}
+.form-actions {
+  display: flex;
+  gap: 1em;
+  align-items: center;
+  margin-top: 1em;
+}
+.btn-secondary {
+  background-color: #95a5a6;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-secondary:hover {
+  background-color: #7f8c8d;
 }
 .new-tag-input {
   display: flex;

@@ -58,12 +58,13 @@
 </template>
 
 <script>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { db } from '../firebase';
 import { doc, getDoc, collection, query, onSnapshot, addDoc, deleteDoc, getDocs, where, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 import Comments from './Comments.vue';
 import { getDistance } from '../utils/geolocation.js';
+import { updateMetaTags, resetMetaTags } from '../utils/meta.js';
 
 export default {
   name: 'ReviewDetailModal',
@@ -178,6 +179,23 @@ export default {
         // Set up like listener
         setupLikeListener();
 
+        // Update meta tags for social media sharing
+        // Use clean URL format for better social media previews
+        const shareUrl = `${window.location.origin}/review/${review.value.id}`;
+        const shareTitle = `${review.value.userName}'s Review of ${review.value.restaurantName}`;
+        const shareDescription = review.value.text 
+          ? `"${review.value.text.substring(0, 150)}${review.value.text.length > 150 ? '...' : ''}"` 
+          : `${review.value.userName} rated ${review.value.restaurantName} ${review.value.rating} stars`;
+        const shareImage = review.value.photoURL || '';
+
+        updateMetaTags({
+          title: shareTitle,
+          description: shareDescription,
+          image: shareImage,
+          url: shareUrl,
+          type: 'article'
+        });
+
       } catch (err) {
         console.error('Error fetching review:', err);
         error.value = 'Failed to load review. Please try again.';
@@ -236,12 +254,21 @@ export default {
       if (props.reviewId) {
         if (likeUnsubscribe) likeUnsubscribe();
         fetchReview();
+      } else {
+        resetMetaTags();
       }
     }, { immediate: true });
 
     onMounted(() => {
       if (props.reviewId) {
         fetchReview();
+      }
+    });
+
+    onUnmounted(() => {
+      resetMetaTags();
+      if (likeUnsubscribe) {
+        likeUnsubscribe();
       }
     });
 

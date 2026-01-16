@@ -39,6 +39,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, documentId } from 'firebase/firestore';
+import { showToast } from '../utils/toast.js';
 
 export default {
   name: 'Comments',
@@ -152,14 +153,20 @@ export default {
 
     const deleteComment = async (commentId) => {
       if (confirm('Are you sure you want to delete this comment?')) {
-        const parentDocRef = doc(db, props.postType, props.postId);
-        const commentsCollection = collection(parentDocRef, 'comments');
-        const commentDoc = doc(commentsCollection, commentId);
-        const reviewDocRef = doc(db, 'reviews', props.postId);
-        await Promise.all([
-          deleteDoc(commentDoc),
-          updateDoc(reviewDocRef, { lastActivityAt: serverTimestamp() })
-        ]);
+        try {
+          const parentDocRef = doc(db, props.postType, props.postId);
+          const commentsCollection = collection(parentDocRef, 'comments');
+          const commentDoc = doc(commentsCollection, commentId);
+          const reviewDocRef = doc(db, 'reviews', props.postId);
+          await Promise.all([
+            deleteDoc(commentDoc),
+            updateDoc(reviewDocRef, { lastActivityAt: serverTimestamp() })
+          ]);
+          showToast('Comment deleted successfully', 'success');
+        } catch (error) {
+          console.error('Error deleting comment:', error);
+          showToast('Failed to delete comment. Please try again.', 'error');
+        }
       }
     };
 

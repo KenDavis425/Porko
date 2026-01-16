@@ -60,7 +60,7 @@
           <div v-else class="review-body">
             <StarRating :rating="review.rating" />
             <p v-if="review.text" class="review-text">"{{ review.text }}"</p>
-            <img v-if="review.photoURL" :src="review.photoURL" alt="Review photo" class="review-photo" />
+            <img v-if="review.photoURL" :src="review.photoURL" alt="Review photo" class="review-photo" loading="lazy" />
             <div v-if="review.tags && review.tags.length > 0" class="tags-container">
               <span v-for="tag in review.tags" :key="tag" class="tag">{{ tag }}</span>
             </div>
@@ -98,6 +98,7 @@ import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDo
 import StarRating from './StarRating.vue';
 import Comments from './Comments.vue';
 import { getDistance } from '../utils/geolocation.js';
+import { showToast } from '../utils/toast.js';
 
 const props = defineProps({
   user: {
@@ -114,6 +115,7 @@ const restaurantsMap = ref(new Map());
 const editingReviewId = ref(null);
 const editingText = ref('');
 const editingRating = ref(0);
+const originalEditData = ref(null);
 const userLocation = ref(null);
 const leaderboardRanks = ref(new Map());
 
@@ -210,7 +212,9 @@ const toggleLike = async (reviewId) => {
 
 const shareReview = async (reviewId) => {
   const baseUrl = window.location.origin;
-  const shareableLink = `${baseUrl}/#review/${reviewId}`;
+  // Use clean URL format for better social media previews
+  // The Cloud Function will handle /review/{reviewId} format
+  const shareableLink = `${baseUrl}/review/${reviewId}`;
   
   // Try Web Share API first (mobile-friendly)
   if (navigator.share) {
@@ -229,15 +233,18 @@ const shareReview = async (reviewId) => {
     }
   }
   
-  // Fallback: Copy to clipboard
-  try {
-    await navigator.clipboard.writeText(shareableLink);
-    alert('Link copied to clipboard!');
-  } catch (err) {
-    console.error('Failed to copy link:', err);
-    // Fallback: Show link in prompt
-    prompt('Copy this link:', shareableLink);
-  }
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareableLink);
+        showToast('Link copied to clipboard!', 'success');
+      } catch (err) {
+        console.error('Failed to copy link:', err);
+        // Fallback: Show link in prompt
+        const copied = prompt('Copy this link:', shareableLink);
+        if (copied) {
+          showToast('Link copied!', 'success');
+        }
+      }
 };
 
 onMounted(() => {
@@ -321,12 +328,28 @@ const startEditing = (review) => {
   editingReviewId.value = review.id;
   editingText.value = review.text || '';
   editingRating.value = review.rating || 0;
+  originalEditData.value = {
+    text: review.text || '',
+    rating: review.rating || 0
+  };
 };
 
 const cancelEdit = () => {
-  editingReviewId.value = null;
-  editingText.value = '';
-  editingRating.value = 0;
+  if (originalEditData.value && 
+      (editingText.value !== originalEditData.value.text || 
+       editingRating.value !== originalEditData.value.rating)) {
+    if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+      editingReviewId.value = null;
+      editingText.value = '';
+      editingRating.value = 0;
+      originalEditData.value = null;
+    }
+  } else {
+    editingReviewId.value = null;
+    editingText.value = '';
+    editingRating.value = 0;
+    originalEditData.value = null;
+  }
 };
 
 const saveEdit = async () => {
@@ -340,9 +363,10 @@ const saveEdit = async () => {
       lastActivityAt: serverTimestamp() // Update lastActivityAt when editing
     });
     cancelEdit();
+    showToast('Review updated successfully!', 'success');
   } catch (error) {
     console.error('Error updating review:', error);
-    alert('Failed to save review. Please try again.');
+    showToast('Failed to save review. Please try again.', 'error');
   }
 };
 
@@ -351,9 +375,10 @@ const deleteReview = async (reviewId) => {
   
   try {
     await deleteDoc(doc(db, 'reviews', reviewId));
+    showToast('Review deleted successfully', 'success');
   } catch (error) {
     console.error('Error deleting review:', error);
-    alert('Failed to delete review. Please try again.');
+    showToast('Failed to delete review. Please try again.', 'error');
   }
 };
 </script>
