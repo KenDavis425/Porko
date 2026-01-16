@@ -6,7 +6,10 @@
         <button @click="showCompleted = true" :class="{ active: showCompleted }">Completed</button>
       </div>
     </div>
-    <div v-if="loading" class="loading-indicator">Loading your bucket list...</div>
+    <div v-if="!currentUser" class="no-items-message">
+      <p>Please log in to view your bucket list.</p>
+    </div>
+    <div v-else-if="loading" class="loading-indicator">Loading your bucket list...</div>
     <div v-else-if="filteredItems.length === 0" class="no-items-message">
       <p v-if="!showCompleted">Your bucket list is empty. Add some restaurants to try!</p>
       <p v-else>You haven't completed any bucket list items yet.</p>
@@ -54,87 +57,120 @@ export default {
     const loading = ref(true);
     const showCompleted = ref(false);
     const userLocation = ref(null);
+    const currentUser = ref(auth.currentUser);
     let unsubscribe = () => {};
 
-    const fetchBucketList = () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+    // Watch for auth state changes
+    auth.onAuthStateChanged((user) => {
+      currentUser.value = user;
+      if (!user) {
         loading.value = false;
+        bucketListItems.value = [];
+        if (unsubscribe) unsubscribe();
+      } else {
+        fetchBucketList();
+      }
+    });
+
+    const fetchBucketList = () => {
+      const user = auth.currentUser;
+      if (!user) {
+        loading.value = false;
+        bucketListItems.value = [];
         return;
       }
 
-      const q = query(collection(db, 'bucketListItems'), where('userId', '==', currentUser.uid));
+      const q = query(collection(db, 'bucketListItems'), where('userId', '==', user.uid));
       
       unsubscribe = onSnapshot(q, async (snapshot) => {
         loading.value = true;
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        if (items.length === 0) {
-          bucketListItems.value = [];
-          loading.value = false;
-          return;
-        }
-
-        const restaurantIds = [...new Set(items.map(item => item.restaurantId))];
-        const restaurantsMap = new Map();
-        
-        if (restaurantIds.length > 0) {
-            // Batch fetch restaurants
-            for (let i = 0; i < restaurantIds.length; i += 30) {
-              const batchIds = restaurantIds.slice(i, i + 30);
-              const restaurantsQuery = query(collection(db, 'restaurants'), where(documentId(), 'in', batchIds));
-              const restaurantsSnapshot = await getDocs(restaurantsQuery);
-              restaurantsSnapshot.forEach(doc => restaurantsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            }
-
-            // Batch fetch review counts and ratings
-            const reviewsQuery = query(collection(db, 'reviews'), where('restaurantId', 'in', restaurantIds));
-            const reviewsSnapshot = await getDocs(reviewsQuery);
-            const ratings = {};
-            reviewsSnapshot.forEach(doc => {
-              const review = doc.data();
-              if (review.restaurantId && typeof review.rating === 'number') {
-                if (!ratings[review.restaurantId]) {
-                  ratings[review.restaurantId] = { total: 0, count: 0 };
-                }
-                ratings[review.restaurantId].total += review.rating;
-                ratings[review.restaurantId].count++;
-              }
-            });
-
-            bucketListItems.value = items.map(item => {
-              const restaurant = restaurantsMap.get(item.restaurantId);
-              if (!restaurant) return null;
-
-              const ratingInfo = ratings[restaurant.id];
-              restaurant.averageRating = ratingInfo ? ratingInfo.total / ratingInfo.count : 0;
-              restaurant.ratingCount = ratingInfo ? ratingInfo.count : 0;
-              restaurant.distance = userLocation.value && restaurant.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null;
-
-              return { ...item, restaurant };
-            }).filter(Boolean);
-        } else {
+        try {
+          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          
+          if (items.length === 0) {
             bucketListItems.value = [];
-        }
+            loading.value = false;
+            return;
+          }
 
+          const restaurantIds = [...new Set(items.map(item => item.restaurantId).filter(Boolean))];
+          const restaurantsMap = new Map();
+          
+          if (restaurantIds.length > 0) {
+              // Batch fetch restaurants
+              for (let i = 0; i < restaurantIds.length; i += 30) {
+                const batchIds = restaurantIds.slice(i, i + 30);
+                const restaurantsQuery = query(collection(db, 'restaurants'), where(documentId(), 'in', batchIds));
+                const restaurantsSnapshot = await getDocs(restaurantsQuery);
+                restaurantsSnapshot.forEach(doc => restaurantsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+              }
+
+              // Batch fetch review counts and ratings
+              const reviewsQuery = query(collection(db, 'reviews'), where('restaurantId', 'in', restaurantIds));
+              const reviewsSnapshot = await getDocs(reviewsQuery);
+              const ratings = {};
+              reviewsSnapshot.forEach(doc => {
+                const review = doc.data();
+                if (review.restaurantId && typeof review.rating === 'number') {
+                  if (!ratings[review.restaurantId]) {
+                    ratings[review.restaurantId] = { total: 0, count: 0 };
+                  }
+                  ratings[review.restaurantId].total += review.rating;
+                  ratings[review.restaurantId].count++;
+                }
+              });
+
+              bucketListItems.value = items.map(item => {
+                const restaurant = restaurantsMap.get(item.restaurantId);
+                if (!restaurant) return null;
+
+                const ratingInfo = ratings[restaurant.id];
+                restaurant.averageRating = ratingInfo ? ratingInfo.total / ratingInfo.count : 0;
+                restaurant.ratingCount = ratingInfo ? ratingInfo.count : 0;
+                restaurant.distance = userLocation.value && restaurant.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null;
+
+                return { ...item, restaurant };
+              }).filter(Boolean);
+          } else {
+              // No valid restaurant IDs found in items
+              bucketListItems.value = [];
+          }
+        } catch (error) {
+          console.error('Error loading bucket list:', error);
+          bucketListItems.value = [];
+        } finally {
+          loading.value = false;
+        }
+      }, (error) => {
+        console.error('Error in bucket list snapshot:', error);
+        bucketListItems.value = [];
         loading.value = false;
       });
     };
 
     onMounted(() => {
+      // Get user location if available, but don't block on it
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(position => {
           userLocation.value = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
-          fetchBucketList();
+          // Location updated - refresh distances if bucket list is already loaded
+          if (bucketListItems.value.length > 0 && currentUser.value) {
+            fetchBucketList();
+          }
         }, (error) => {
           console.error("Error getting location for bucket list", error);
-          fetchBucketList();
         });
-      } else {
+      }
+      
+      // Fetch bucket list if user is already logged in (onAuthStateChanged handles new logins)
+      if (currentUser.value) {
         fetchBucketList();
+      } else {
+        loading.value = false;
       }
     });
 
@@ -176,6 +212,7 @@ export default {
       removeFromBucketList,
       getDirectionsUrl,
       getDetailsUrl,
+      currentUser
     };
   }
 };

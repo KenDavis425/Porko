@@ -11,7 +11,10 @@
           <div class="user-info">
             <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" class="user-avatar" alt="User" referrerpolicy="no-referrer" />
             <div class="user-details">
-              <span class="user-name">{{ user.displayName }}</span>
+              <div class="user-name-line">
+                <span class="user-name">{{ user.displayName }}</span>
+                <span v-if="user.medal" class="medal">{{ user.medal }}</span>
+              </div>
             </div>
           </div>
           <div v-if="user.lastReview" class="last-review">
@@ -45,6 +48,20 @@ import { collection, query, where, getDocs, doc, deleteDoc, orderBy, limit, onSn
 import StarRating from './StarRating.vue';
 import UserReviewsModal from './UserReviewsModal.vue';
 
+const getMedal = (index) => {
+  // Medals are assigned based on position (0-indexed)
+  // Position 1 (index 0): Gold medal 🥇
+  // Position 2 (index 1): Silver medal 🥈
+  // Position 3 (index 2): Bronze medal 🥉
+  // Positions 4-10 (index 3-9): Participation medal 🏅
+  if (typeof index !== 'number') return null;
+  if (index === 0) return '🥇';
+  if (index === 1) return '🥈';
+  if (index === 2) return '🥉';
+  if (index >= 3 && index < 10) return '🏅';
+  return null;
+};
+
 export default {
   name: 'Following',
   components: { StarRating, UserReviewsModal },
@@ -53,6 +70,7 @@ export default {
     const loading = ref(true);
     const isReviewsModalVisible = ref(false);
     const userForReviews = ref(null);
+    const leaderboardRanks = ref(new Map());
     let unsubscribe = () => {};
 
     const fetchFollowing = async () => {
@@ -62,6 +80,27 @@ export default {
         loading.value = false;
         return;
       }
+
+      // Fetch leaderboard ranks
+      const leaderboardSnap = await getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30)));
+      const usersWithReviews = leaderboardSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(user => {
+          const count = Number(user.reviewCount) || 0;
+          return count > 0;
+        })
+        .sort((a, b) => {
+          const countA = Number(a.reviewCount) || 0;
+          const countB = Number(b.reviewCount) || 0;
+          return countB - countA;
+        })
+        .slice(0, 10);
+      
+      const ranks = new Map();
+      usersWithReviews.forEach((user, index) => {
+        ranks.set(user.id, index);
+      });
+      leaderboardRanks.value = ranks;
 
       const followsQuery = query(collection(db, 'follows'), where('followerId', '==', currentUser.uid));      
       unsubscribe = onSnapshot(followsQuery, async (followsSnap) => {
@@ -109,7 +148,8 @@ export default {
               restaurantName: restaurantsMap.get(reviewData.restaurantId) || 'Unknown Restaurant'
             };
           }
-          return { ...user, lastReview };
+          const rank = leaderboardRanks.value.get(user.uid);
+          return { ...user, lastReview, medal: getMedal(rank) };
         })
       );
 
@@ -161,7 +201,15 @@ export default {
 .user-info { display: flex; align-items: center; gap: 1em; min-width: 0; }
 .user-details { min-width: 0; }
 .user-avatar { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; }
+.user-name-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
 .user-name { font-weight: 600; font-size: 1.1em; word-break: break-word; }
+.medal {
+  font-size: 1.1em;
+}
 .user-actions { display: flex; gap: 0.75em; }
 .user-actions .action-btn { background: none; border: 1px solid #ccc; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: #555; }
 .user-actions .action-btn:hover { background-color: #f0f0f0; border-color: #bbb; }

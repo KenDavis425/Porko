@@ -431,6 +431,8 @@ export default {
         // Add a review document
         await addDoc(collection(db, 'reviews'), {
           userId: currentUser.uid,
+          userName: currentUser.displayName || 'Anonymous',
+          userPhoto: currentUser.photoURL || null,
           restaurantId: selectedRestaurant.value,
           photoURL,
           rating: rating.value,

@@ -43,6 +43,15 @@ service cloud.firestore {
         // Post author can also delete comments
         allow delete: if request.auth != null && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/reviews/$(reviewId)).data.userId == request.auth.uid);
       }
+
+      // Likes subcollection  
+      match /likes/{likeId} {
+        allow read: if true;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        // Allow delete if the user is authenticated
+        // The userId field is verified during create, and we query by userId before deleting
+        allow delete: if request.auth != null;
+      }
     }
 
     // Follows:

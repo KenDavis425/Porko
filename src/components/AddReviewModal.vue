@@ -143,6 +143,7 @@ export default {
           });
         }
 
+        const timestamp = serverTimestamp();
         const reviewData = {
           userId: props.user.uid,
           userName: props.user.displayName || 'Anonymous',
@@ -151,7 +152,9 @@ export default {
           rating: review.value.rating,
           text: review.value.text,
           photoURL: photoURL,
-          createdAt: serverTimestamp()
+          tags: [], // AddReviewModal doesn't support tags yet
+          createdAt: timestamp,
+          lastActivityAt: timestamp
         };
 
         await addDoc(collection(db, 'reviews'), reviewData);

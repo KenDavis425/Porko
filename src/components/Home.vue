@@ -66,6 +66,15 @@
                 <span v-for="tag in post.tags" :key="tag" class="tag">{{ tag }}</span>
               </div>
             </div>
+            <div class="post-actions">
+              <button @click="toggleLike(post.id)" class="like-btn" :class="{ 'liked': post.isLiked }" :disabled="!user">
+                <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="currentColor">
+                  <path d="M0 0h24v24H0V0z" fill="none"/>
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+                <span>{{ post.likeCount || 0 }}</span>
+              </button>
+            </div>
             <Comments :post-id="post.id"
                       :user="user"
                       post-type="reviews"
@@ -82,7 +91,7 @@
 <script>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import Comments from './Comments.vue';
 import StarRating from './StarRating.vue';
 import { getDistance } from '../utils/geolocation.js';
@@ -244,12 +253,26 @@ export default {
           followsPromise,
           getDocs(collection(db, 'restaurants')),
           getDocs(collection(db, 'users')),
-          getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3)))
+          getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30)))
         ]);
 
+        // Filter out users with 0 or undefined reviewCount, then sort and assign ranks
+        const usersWithReviews = leaderboardSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(user => {
+            const count = Number(user.reviewCount) || 0;
+            return count > 0;
+          })
+          .sort((a, b) => {
+            const countA = Number(a.reviewCount) || 0;
+            const countB = Number(b.reviewCount) || 0;
+            return countB - countA;
+          })
+          .slice(0, 10); // Take only top 10
+        
         const initialRanks = new Map();
-        leaderboardSnap.forEach((doc, index) => {
-          initialRanks.set(doc.id, index);
+        usersWithReviews.forEach((user, index) => {
+          initialRanks.set(user.id, index);
         });
         leaderboardRanks.value = initialRanks;
 
@@ -263,13 +286,27 @@ export default {
           usersMap.set(doc.id, doc.data());
         });
 
-        const leaderboardQuery = query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(3));
+        const leaderboardQuery = query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30));
         const unsubLeaderboard = onSnapshot(
           leaderboardQuery, 
           (leaderboardSnap) => {
+            // Filter out users with 0 or undefined reviewCount, then sort and assign ranks
+            const usersWithReviews = leaderboardSnap.docs
+              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .filter(user => {
+                const count = Number(user.reviewCount) || 0;
+                return count > 0;
+              })
+              .sort((a, b) => {
+                const countA = Number(a.reviewCount) || 0;
+                const countB = Number(b.reviewCount) || 0;
+                return countB - countA;
+              })
+              .slice(0, 10); // Take only top 10
+            
             const newRanks = new Map();
-            leaderboardSnap.forEach((doc, index) => {
-              newRanks.set(doc.id, index);
+            usersWithReviews.forEach((user, index) => {
+              newRanks.set(user.id, index);
             });
             leaderboardRanks.value = newRanks;
             processAndSetPosts();
@@ -299,9 +336,14 @@ export default {
                 distance: userLocation.value && restaurant?.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null,
                 userName: user?.displayName || 'Unknown User',
                 userPhoto: user?.photoURL || null,
-                medal: getMedal(rank)
+                medal: getMedal(rank),
+                likeCount: 0,
+                isLiked: false
               };
               allPosts.set(post.id, post);
+              
+              // Set up like listener for this post
+              setupLikeListener(post.id);
             }
           });
           processAndSetPosts();
@@ -443,10 +485,16 @@ export default {
     };
 
     const getMedal = (index) => {
+      // Medals are assigned based on position (0-indexed)
+      // Position 1 (index 0): Gold medal 🥇
+      // Position 2 (index 1): Silver medal 🥈
+      // Position 3 (index 2): Bronze medal 🥉
+      // Positions 4-10 (index 3-9): Participation medal 🏅
       if (typeof index !== 'number') return null;
       if (index === 0) return '🥇';
       if (index === 1) return '🥈';
-      if (index === 2) return '🥉';      
+      if (index === 2) return '🥉';
+      if (index >= 3 && index < 10) return '🏅';
       return null;
     };
 
@@ -471,6 +519,50 @@ export default {
       }
     };
 
+    const setupLikeListener = (reviewId) => {
+      const currentUser = props.user;
+      const reviewRef = doc(db, 'reviews', reviewId);
+      const likesCollection = collection(reviewRef, 'likes');
+      const likesQuery = query(likesCollection);
+      
+      const unsub = onSnapshot(likesQuery, (snapshot) => {
+        const post = allPosts.get(reviewId);
+        if (post) {
+          post.likeCount = snapshot.size;
+          post.isLiked = currentUser ? snapshot.docs.some(doc => doc.data().userId === currentUser.uid) : false;
+          // Update the post in the map
+          allPosts.set(reviewId, post);
+          // Trigger re-render by updating posts
+          processAndSetPosts();
+        }
+      }, (error) => {
+        console.error('Error fetching likes:', error);
+      });
+      
+      unsubscribes.push(unsub);
+    };
+
+    const toggleLike = async (reviewId) => {
+      const currentUser = props.user;
+      if (!currentUser) return;
+      
+      const reviewRef = doc(db, 'reviews', reviewId);
+      const likesCollection = collection(reviewRef, 'likes');
+      const likeQuery = query(likesCollection, where('userId', '==', currentUser.uid));
+      const likeSnap = await getDocs(likeQuery);
+      
+      if (!likeSnap.empty) {
+        // Unlike - delete the like document
+        await deleteDoc(likeSnap.docs[0].ref);
+      } else {
+        // Like - create a like document
+        await addDoc(likesCollection, {
+          userId: currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      }
+    };
+
     return {
       posts,
       loading,
@@ -482,7 +574,8 @@ export default {
       toggleBucketList,
       userLocation,
       sortOrder,
-      setSortOrder
+      setSortOrder,
+      toggleLike
     };
   }
 };
@@ -619,6 +712,46 @@ export default {
 }
 .bucket-list-btn.in-bucket-list, .bucket-list-btn:hover {
   color: var(--primary-color);
+}
+
+.post-actions {
+  display: flex;
+  gap: 1em;
+  margin-top: 0.75em;
+  padding-top: 0.75em;
+  border-top: 1px solid #eee;
+}
+
+.like-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5em 0.75em;
+  border-radius: 8px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.like-btn:hover:not(:disabled) {
+  background-color: #f0f0f0;
+}
+
+.like-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.like-btn.liked {
+  color: #e74c3c;
+}
+
+.like-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .medal {

@@ -16,7 +16,10 @@
           <div class="user-info">
             <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" class="user-avatar" alt="User" />
             <div class="user-details">
-              <span class="user-name">{{ user.displayName }}</span>
+              <div class="user-name-line">
+                <span class="user-name">{{ user.displayName }}</span>
+                <span v-if="user.medal" class="medal">{{ user.medal }}</span>
+              </div>
               <div v-if="user.distance !== null" class="user-distance">{{ user.distance.toFixed(1) }} miles away</div>
             </div>
           </div>
@@ -63,7 +66,22 @@ export default {
     const searchQuery = ref('');
     const isReviewsModalVisible = ref(false);
     const userForReviews = ref(null);
+    const leaderboardRanks = ref(new Map());
     let followsUnsubscribe = () => {};
+    
+    const getMedal = (index) => {
+      // Medals are assigned based on position (0-indexed)
+      // Position 1 (index 0): Gold medal 🥇
+      // Position 2 (index 1): Silver medal 🥈
+      // Position 3 (index 2): Bronze medal 🥉
+      // Positions 4-10 (index 3-9): Participation medal 🏅
+      if (typeof index !== 'number') return null;
+      if (index === 0) return '🥇';
+      if (index === 1) return '🥈';
+      if (index === 2) return '🥉';
+      if (index >= 3 && index < 10) return '🏅';
+      return null;
+    };
 
     const fetchUsers = async () => {
       loading.value = true;
@@ -81,6 +99,27 @@ export default {
           isFollowing: newFollowing.includes(u.uid)
         }));
       });
+
+      // Fetch leaderboard ranks
+      const leaderboardSnap = await getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30)));
+      const usersWithReviews = leaderboardSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(user => {
+          const count = Number(user.reviewCount) || 0;
+          return count > 0;
+        })
+        .sort((a, b) => {
+          const countA = Number(a.reviewCount) || 0;
+          const countB = Number(b.reviewCount) || 0;
+          return countB - countA;
+        })
+        .slice(0, 10);
+      
+      const ranks = new Map();
+      usersWithReviews.forEach((user, index) => {
+        ranks.set(user.id, index);
+      });
+      leaderboardRanks.value = ranks;
 
       const restaurantsSnap = await getDocs(collection(db, 'restaurants'));
       const restaurantsMap = new Map();
@@ -126,11 +165,13 @@ export default {
             }
           }
 
+          const rank = leaderboardRanks.value.get(user.uid);
           return {
             ...user,
             isFollowing: following.value.includes(user.uid),
             lastReview,
-            distance
+            distance,
+            medal: getMedal(rank)
           };
         })
       );
@@ -276,10 +317,18 @@ export default {
   border-radius: 50%;
   flex-shrink: 0;
 }
+.user-name-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
 .user-name {
   font-weight: 600;
   font-size: 1.1em;
   word-break: break-word;
+}
+.medal {
+  font-size: 1.1em;
 }
 .user-distance {
   font-size: 0.9em;

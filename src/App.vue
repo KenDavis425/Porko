@@ -64,10 +64,6 @@
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
               <span>Database Stats</span>
             </button>
-            <button v-if="isAdmin" class="sidebar-link" :class="{ 'active': currentPage === 'backfill-admin' }" @click="goToBackfillAdmin" title="Backfill Admin">
-              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M13 3a9 9 0 1 0 8.95 8H19a7 7 0 1 1-6.97-6V3zM12 8v5l4 2"/></svg>
-              <span>Backfill Admin</span>
-            </button>
             <button v-if="user" class="sidebar-link" @click="logout" title="Logout">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
               <span>Logout</span>
@@ -83,11 +79,6 @@
               </svg>
             </button>
             <div class="app-version">v{{ appVersion }}</div>
-            <button v-if="isAdmin" class="sidebar-link" :disabled="backfillInProgress" @click="runBackfill" title="Backfill review counts">
-              <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M13 3a9 9 0 1 0 8.95 8H19a7 7 0 1 1-6.97-6V3zM12 8v5l4 2"/></svg>
-              <span>{{ backfillInProgress ? 'Backfilling...' : 'Backfill Reviews' }}</span>
-            </button>
-            <div v-if="backfillStatus" class="sidebar-status" style="font-size:0.8em;color:#666;padding:0.2em 0.5em">{{ backfillStatus }}</div>
         </div>
       </aside>
       <main class="main-content">
@@ -114,7 +105,6 @@ import UserSearch from './components/UserSearch.vue';
 import Review from './components/Review.vue';
 import Recommendations from './components/Recommendations.vue';
 import DatabaseStats from './components/DatabaseStats.vue';
-import BackfillAdmin from './components/BackfillAdmin.vue';
 import MyReviews from './components/MyReviews.vue';
 import Leaderboard from './components/Leaderboard.vue';
 import Followers from './components/Followers.vue';
@@ -124,7 +114,6 @@ import { ref, computed } from 'vue';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, provider, signInWithPopup, signOut, db } from './firebase';
 import { collection, query, where, getDocs, doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
-import backfillReviewCounts from './utils/backfillReviewCounts';
 
 export default {
   name: 'App',
@@ -136,7 +125,6 @@ export default {
     Review,
     Recommendations,
     DatabaseStats,
-    BackfillAdmin,
     MyReviews,
     Leaderboard,
     Followers,
@@ -153,33 +141,9 @@ export default {
       return user.value && user.value.email === 'kennected.com@gmail.com';
     });
 
-    const backfillInProgress = ref(false);
-    const backfillStatus = ref('');
-
-    const runBackfill = async () => {
-      if (!isAdmin.value) return alert('Only admins can run this operation.');
-      if (!confirm('This will write review counts to many user documents. Are you sure you want to proceed?')) return;
-      backfillInProgress.value = true;
-      backfillStatus.value = 'Starting backfill...';
-      try {
-        await backfillReviewCounts((msg) => {
-          backfillStatus.value = msg;
-        });
-        backfillStatus.value = 'Backfill completed successfully.';
-        // optionally navigate to leaderboard to show results
-        currentPage.value = 'leaderboard';
-      } catch (err) {
-        console.error('Backfill failed:', err);
-        backfillStatus.value = 'Backfill failed: ' + (err?.message || String(err));
-      } finally {
-        backfillInProgress.value = false;
-        setTimeout(() => backfillStatus.value = '', 5000);
-      }
-    };
-
     const protectedPages = new Set([
       'review', 'user-search', 'bucket-list', 'my-reviews', 
-      'followers', 'following', 'database-stats', 'backfill-admin'
+      'followers', 'following', 'database-stats'
     ]);
 
     const componentMap = {
@@ -191,9 +155,7 @@ export default {
       'my-reviews': 'MyReviews',
       'recommendations': 'Recommendations',
       'leaderboard': 'Leaderboard',
-      'cleanup': 'Cleanup',
       'database-stats': 'DatabaseStats',
-      'backfill-admin': 'BackfillAdmin',
       'followers': 'Followers',
       'following': 'Following'
     };
@@ -278,10 +240,6 @@ export default {
       currentPage.value = 'database-stats';
     };
 
-    const goToBackfillAdmin = () => {
-      currentPage.value = 'backfill-admin';
-    };
-
     const goToFollowers = () => {
       currentPage.value = 'followers';
     };
@@ -299,7 +257,7 @@ export default {
       currentPage.value = 'review';
     };
 
-    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToBackfillAdmin, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, backfillInProgress, backfillStatus, runBackfill };
+    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion };
   }
 }; 
 </script>

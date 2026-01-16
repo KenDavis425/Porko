@@ -50,15 +50,6 @@
         <button type="submit" :disabled="isSaving" class="btn-save">{{ isSaving ? 'Saving...' : 'Save Restaurant' }}</button>
       </form>
     </div>
-    <div v-if="userLeaderboard.length > 0" class="leaderboard-container">
-      <h3>Top Reviewers</h3>
-      <ol class="leaderboard-list">
-        <li v-for="user in userLeaderboard.slice(0, 5)" :key="user.userId">
-          <span class="leaderboard-user">{{ user.displayName }}</span>
-          <span class="leaderboard-count">{{ user.postCount }} {{ user.postCount === 1 ? 'review' : 'reviews' }}</span>
-        </li>
-      </ol>
-    </div>
     <div v-if="loading" class="loading-indicator">Loading restaurants...</div>
     <div v-else class="restaurant-list-container">
       <ul v-if="filteredRestaurants.length > 0" class="restaurant-list">
@@ -177,27 +168,6 @@ export default {
       });
     });
 
-    const userLeaderboard = computed(() => {
-      if (!rawReviews.value.length) {
-        return [];
-      }
-
-      const userPostCounts = rawReviews.value.reduce((acc, review) => {
-        if (review.userId) {
-          if (!acc[review.userId]) {
-            acc[review.userId] = {
-              userId: review.userId,
-              displayName: review.userName || 'Anonymous',
-              postCount: 0
-            };
-          }
-          acc[review.userId].postCount++;
-        }
-        return acc;
-      }, {});
-
-      return Object.values(userPostCounts).sort((a, b) => b.postCount - a.postCount);
-    });
 
     onMounted(() => {
       loading.value = true;
@@ -501,8 +471,7 @@ export default {
       restaurantIdForNewReview,
       openAddReviewModal,
       closeAddReviewModal,
-      handleReviewAdded,
-      userLeaderboard
+      handleReviewAdded
     };
   }
 };
@@ -680,41 +649,6 @@ export default {
 
 .in-bucket-list {
   color: var(--primary-color) !important;
-}
-
-.leaderboard-container {
-  background: var(--card-background);
-  border-radius: 12px;
-  padding: 1.5em;
-  margin-bottom: 2em;
-  box-shadow: 0 4px 15px var(--shadow-color);
-}
-.leaderboard-container h3 {
-  margin-top: 0;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 0.5em;
-  margin-bottom: 1em;
-}
-.leaderboard-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.leaderboard-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75em 0;
-}
-.leaderboard-list li:not(:last-child) {
-  border-bottom: 1px solid #f5f5f5;
-}
-.leaderboard-user {
-  font-weight: 600;
-}
-.leaderboard-count {
-  color: #555;
-  font-weight: 500;
 }
 
 @media (max-width: 768px) {
