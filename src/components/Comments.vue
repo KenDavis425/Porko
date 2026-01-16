@@ -178,8 +178,8 @@ export default {
 
 <style scoped>
 .comments-section {
-  margin-top: 1.5em;
-  padding-top: 1.5em;
+  margin-top: 0.5em;
+  padding-top: 0.75em;
   border-top: 1px solid #eee;
 }
 .comment-list { margin-bottom: 1em; }

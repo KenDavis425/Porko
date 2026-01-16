@@ -758,8 +758,10 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 0.75em;
-  padding-top: 0.75em;
+  margin-top: 0.5em;
+  padding-top: 0.5em;
+  margin-bottom: 0;
+  padding-bottom: 0;
   border-top: 1px solid #eee;
 }
 

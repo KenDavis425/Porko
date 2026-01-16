@@ -442,21 +442,31 @@ export default {
           lastActivityAt: timestamp
         });
 
-        // Update the user's reviewCount atomically
+        // Update the user's reviewCount atomically (non-blocking - don't fail if this errors)
         // Using increment() ensures thread-safe updates and handles the case where reviewCount doesn't exist yet
-        const userRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(userRef, { reviewCount: increment(1) });
+        try {
+          const userRef = doc(db, 'users', currentUser.uid);
+          await updateDoc(userRef, { reviewCount: increment(1) });
+        } catch (countError) {
+          console.warn("Failed to update reviewCount (non-critical):", countError);
+          // Don't fail the entire submission if reviewCount update fails
+        }
 
-        // Check if this restaurant is on the bucket list and mark as complete
-        const bucketListQuery = query(
-          collection(db, 'bucketListItems'),
-          where('userId', '==', currentUser.uid),
-          where('restaurantId', '==', selectedRestaurant.value)
-        );
-        const bucketListSnapshot = await getDocs(bucketListQuery);
-        if (!bucketListSnapshot.empty) {
-          const bucketListItemDoc = bucketListSnapshot.docs[0];
-          await updateDoc(bucketListItemDoc.ref, { completedAt: timestamp });
+        // Check if this restaurant is on the bucket list and mark as complete (non-blocking)
+        try {
+          const bucketListQuery = query(
+            collection(db, 'bucketListItems'),
+            where('userId', '==', currentUser.uid),
+            where('restaurantId', '==', selectedRestaurant.value)
+          );
+          const bucketListSnapshot = await getDocs(bucketListQuery);
+          if (!bucketListSnapshot.empty) {
+            const bucketListItemDoc = bucketListSnapshot.docs[0];
+            await updateDoc(bucketListItemDoc.ref, { completedAt: timestamp });
+          }
+        } catch (bucketError) {
+          console.warn("Failed to update bucket list (non-critical):", bucketError);
+          // Don't fail the entire submission if bucket list update fails
         }
 
         emit('reviewed');
