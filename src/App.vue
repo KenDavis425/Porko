@@ -94,6 +94,12 @@
           />
         </keep-alive>
       </main>
+      <ReviewDetailModal 
+        v-if="sharedReviewId"
+        :review-id="sharedReviewId"
+        :user="user"
+        @close="closeReviewModal"
+      />
     </div>
   </div>
 </template>
@@ -110,7 +116,8 @@ import Leaderboard from './components/Leaderboard.vue';
 import Followers from './components/Followers.vue';
 import BucketList from './components/BucketList.vue';
 import Following from './components/Following.vue';
-import { ref, computed } from 'vue';
+import ReviewDetailModal from './components/ReviewDetailModal.vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, provider, signInWithPopup, signOut, db } from './firebase';
 import { collection, query, where, getDocs, doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
@@ -128,7 +135,8 @@ export default {
     MyReviews,
     Leaderboard,
     Followers,
-    Following
+    Following,
+    ReviewDetailModal
   },
   setup() {
     const user = ref(null);
@@ -136,6 +144,7 @@ export default {
     const selectedRestaurantForReview = ref(null);
     const isSidebarCollapsed = ref(window.innerWidth < 768);
     const appVersion = ref(process.env.VUE_APP_VERSION || 'dev');
+    const sharedReviewId = ref(null);
 
     const isAdmin = computed(() => {
       return user.value && user.value.email === 'kennected.com@gmail.com';
@@ -257,7 +266,37 @@ export default {
       currentPage.value = 'review';
     };
 
-    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion };
+    const handleDeepLink = () => {
+      // Check for review deep link: #review/{reviewId}
+      const hash = window.location.hash;
+      const reviewMatch = hash.match(/#review\/([^/]+)/);
+      if (reviewMatch) {
+        const reviewId = reviewMatch[1];
+        sharedReviewId.value = reviewId;
+        // Navigate to home so sidebar works correctly
+        currentPage.value = 'home';
+        // Clear the hash to avoid showing it again on reload
+        window.location.hash = '';
+      }
+    };
+
+    const closeReviewModal = () => {
+      sharedReviewId.value = null;
+    };
+
+    onMounted(() => {
+      // Check for deep links on mount
+      handleDeepLink();
+      
+      // Listen for hash changes (in case user navigates with back/forward)
+      window.addEventListener('hashchange', handleDeepLink);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener('hashchange', handleDeepLink);
+    });
+
+    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, sharedReviewId, closeReviewModal };
   }
 }; 
 </script>

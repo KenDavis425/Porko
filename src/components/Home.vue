@@ -74,6 +74,13 @@
                 </svg>
                 <span>{{ post.likeCount || 0 }}</span>
               </button>
+              <button @click="shareReview(post.id)" class="share-btn" :title="'Share this review'">
+                <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="currentColor">
+                  <path d="M0 0h24v24H0V0z" fill="none"/>
+                  <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                </svg>
+                <span>Share</span>
+              </button>
             </div>
             <Comments :post-id="post.id"
                       :user="user"
@@ -563,6 +570,38 @@ export default {
       }
     };
 
+    const shareReview = async (reviewId) => {
+      const baseUrl = window.location.origin;
+      const shareableLink = `${baseUrl}/#review/${reviewId}`;
+      
+      // Try Web Share API first (mobile-friendly)
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'Check out this review on PorkHub',
+            text: 'Check out this review on PorkHub',
+            url: shareableLink
+          });
+          return;
+        } catch (err) {
+          // User cancelled or error - fall through to copy
+          if (err.name !== 'AbortError') {
+            console.error('Error sharing:', err);
+          }
+        }
+      }
+      
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareableLink);
+        alert('Link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy link:', err);
+        // Fallback: Show link in prompt
+        prompt('Copy this link:', shareableLink);
+      }
+    };
+
     return {
       posts,
       loading,
@@ -575,7 +614,8 @@ export default {
       userLocation,
       sortOrder,
       setSortOrder,
-      toggleLike
+      toggleLike,
+      shareReview
     };
   }
 };
@@ -716,10 +756,34 @@ export default {
 
 .post-actions {
   display: flex;
-  gap: 1em;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 0.75em;
   padding-top: 0.75em;
   border-top: 1px solid #eee;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5em 0.75em;
+  border-radius: 8px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.share-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.share-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .like-btn {
