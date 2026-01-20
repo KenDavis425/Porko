@@ -182,31 +182,33 @@ export default {
 .user-stats-panel {
   background: var(--card-background);
   border-radius: 8px;
-  padding: 2rem;
+  padding: 1rem;
   box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .user-stats-panel h2 {
   color: var(--primary-color);
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .stat-card {
   background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
   border: 1px solid var(--primary-color);
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.75rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  text-align: center;
+  gap: 0.5rem;
   transition: all 0.2s;
 }
 
@@ -216,71 +218,80 @@ export default {
 }
 
 .stat-icon {
-  font-size: 2rem;
+  font-size: 1.5rem;
 }
 
 .stat-content {
   flex: 1;
+  width: 100%;
 }
 
 .stat-label {
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   color: var(--text-color);
   opacity: 0.8;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
 }
 
 .stat-value {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--primary-color);
-  margin-top: 0.25rem;
+  margin-top: 0.1rem;
 }
 
 .badges-section {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .achievement-progress {
-  padding-top: 2rem;
+  padding-top: 1.5rem;
   border-top: 2px solid var(--background-color);
 }
 
 .achievement-progress h3 {
   color: var(--secondary-color);
-  font-size: 1.1rem;
-  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
 }
 
 .progress-item {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .progress-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
 }
 
 .badge-preview {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
+  flex-shrink: 0;
 }
 
 .badge-name {
   flex: 1;
   color: var(--secondary-color);
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .progress-count {
   background: var(--primary-color);
   color: white;
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .progress-bar {
@@ -296,25 +307,77 @@ export default {
   transition: width 0.3s ease;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 769px) {
   .user-stats-panel {
-    padding: 1rem;
+    padding: 2rem;
+  }
+
+  .user-stats-panel h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
   }
 
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
   }
 
   .stat-card {
-    padding: 0.75rem;
+    flex-direction: row;
+    text-align: left;
+    padding: 1rem;
+    gap: 1rem;
   }
 
   .stat-icon {
-    font-size: 1.5rem;
+    font-size: 2rem;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
   }
 
   .stat-value {
-    font-size: 1.25rem;
+    font-size: 1.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .badges-section {
+    margin-bottom: 2rem;
+  }
+
+  .achievement-progress {
+    padding-top: 2rem;
+  }
+
+  .achievement-progress h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  .progress-item {
+    margin-bottom: 1.5rem;
+  }
+
+  .progress-header {
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+  }
+
+  .badge-preview {
+    font-size: 1.5rem;
+  }
+
+  .badge-name {
+    white-space: normal;
+  }
+
+  .progress-count {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
   }
 }
 </style>

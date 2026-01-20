@@ -1,6 +1,6 @@
 {
   "name": "my-vue-app",
-  "version": "1.0.0",
+  "version": "26.1.20",
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",

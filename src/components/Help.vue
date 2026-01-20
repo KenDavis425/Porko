@@ -11,6 +11,7 @@
           <a href="#gamification" @click.prevent="scrollToSection('gamification')" :class="{ active: activeSection === 'gamification' }">Gamification & Social</a>
           <a href="#tips" @click.prevent="scrollToSection('tips')" :class="{ active: activeSection === 'tips' }">Tips & Best Practices</a>
           <a href="#faq" @click.prevent="scrollToSection('faq')" :class="{ active: activeSection === 'faq' }">FAQ</a>
+          <a href="#changelog" @click.prevent="scrollToSection('changelog')" :class="{ active: activeSection === 'changelog' }">Change Log</a>
         </nav>
       </div>
 
@@ -465,6 +466,77 @@
           </div>
         </section>
 
+        <section id="changelog">
+          <h2>Change Log</h2>
+          <p>Track what's new and improved in PorkHub with each release.</p>
+
+          <div class="changelog-item">
+            <h3>Version 26.1.20 — Gamification & Social Features</h3>
+            <p class="release-date">Released January 20, 2026</p>
+            <h4>New Features</h4>
+            <ul>
+              <li><strong>User Profile Page</strong> — Click your profile picture in the sidebar to view your personal stats dashboard</li>
+              <li><strong>Achievement Badges</strong> — Earn 6 different badges as you reach milestones:
+                <ul>
+                  <li>📝 10 Reviews, 💫 25 Reviews, ✨ 50 Reviews, 👑 100 Reviews</li>
+                  <li>📸 Photo Master (10+ photo reviews)</li>
+                  <li>🗺️ All 50 States (reviewed in all 50 US states)</li>
+                </ul>
+              </li>
+              <li><strong>Trending Restaurants</strong> — Discover what's hot in the community with two trending views:
+                <ul>
+                  <li>🔥 Most Reviewed This Week</li>
+                  <li>⭐ Highest Rated This Week</li>
+                </ul>
+              </li>
+              <li><strong>Follow Recommendations</strong> — Get smart suggestions on which quality reviewers to follow based on mutual connections</li>
+              <li><strong>Activity Feed</strong> — See the latest reviews and achievements from users you follow in real-time</li>
+            </ul>
+            <h4>Improvements</h4>
+            <ul>
+              <li>Enhanced user stats tracking (Total Reviews, Photo Reviews, States Visited, Followers)</li>
+              <li>Achievement progress bars showing how close you are to the next badge</li>
+              <li>Better badge visibility throughout the app</li>
+              <li>Gamification features on Home page organized in an attractive 3-column layout</li>
+            </ul>
+          </div>
+
+          <div class="changelog-item">
+            <h3>Version 26.1.5 — Enhanced User Guide</h3>
+            <p class="release-date">Released January 5, 2026</p>
+            <h4>New Features</h4>
+            <ul>
+              <li><strong>In-App User Guide</strong> — Access the complete user guide directly in the application via the Help link in the sidebar</li>
+              <li><strong>Interactive Table of Contents</strong> — Click any section to jump directly to that part of the guide</li>
+              <li><strong>Mobile-Optimized Guide</strong> — User guide formatted for easy reading on all devices</li>
+            </ul>
+            <h4>Improvements</h4>
+            <ul>
+              <li>Updated user guide content to match current application features</li>
+              <li>Added comprehensive tips and best practices section</li>
+              <li>Expanded FAQ with common questions about the app</li>
+            </ul>
+          </div>
+
+          <div class="changelog-item">
+            <h3>Version 24.7.1 — Initial Release</h3>
+            <p class="release-date">Released July 1, 2024</p>
+            <h4>Features</h4>
+            <ul>
+              <li>Browse and review restaurants serving breaded pork tenderloin</li>
+              <li>Write reviews with ratings (1-5 stars) and optional photos</li>
+              <li>Follow other reviewers and see their activity</li>
+              <li>View Leaderboard of top reviewers</li>
+              <li>Create and manage a bucket list of restaurants to visit</li>
+              <li>Search and filter restaurants by location and other criteria</li>
+              <li>Like reviews and leave comments</li>
+              <li>Share reviews with others</li>
+              <li>Location-based features for nearby restaurants</li>
+              <li>Google authentication for secure login</li>
+            </ul>
+          </div>
+        </section>
+
         <div class="help-footer">
           <p>Need more help? Please reach out to the PorkHub support team.</p>
           <p>Happy reviewing and pork tenderloin hunting! 🐷🥓</p>
@@ -685,6 +757,38 @@ export default {
 
 .faq-item p {
   margin: 0.5rem 0 0 0;
+}
+
+.changelog-item {
+  background: var(--background-color);
+  padding: 1.5rem;
+  border-radius: 6px;
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--primary-color);
+}
+
+.changelog-item h3 {
+  margin: 0 0 0.25rem 0;
+  color: var(--primary-color);
+  font-size: 1.2rem;
+}
+
+.release-date {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.changelog-item h4 {
+  margin: 1rem 0 0.5rem 0;
+  color: var(--secondary-color);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.changelog-item ul {
+  margin: 0.5rem 0 1rem 0;
 }
 
 .help-footer {
