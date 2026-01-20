@@ -12,7 +12,7 @@
             <h1 class="sidebar-title">PorkHub</h1>
           </div>
           <div v-if="user" class="sidebar-header">
-            <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" class="sidebar-avatar" alt="User Avatar" referrerpolicy="no-referrer" />
+            <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" class="sidebar-avatar" alt="User Avatar" referrerpolicy="no-referrer" @click="goToProfile" style="cursor: pointer;" title="View Your Profile" />
             <div class="sidebar-user">{{ user.displayName }}</div>
           </div>
           <nav class="sidebar-nav">
@@ -60,6 +60,10 @@
           </nav>
         </div>
         <div class="sidebar-bottom">
+            <button class="sidebar-link" :class="{ 'active': currentPage === 'help' }" @click="goToHelp" title="Help & User Guide">
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+              <span>Help</span>
+            </button>
             <button v-if="isAdmin" class="sidebar-link" :class="{ 'active': currentPage === 'database-stats' }" @click="goToDatabaseStats" title="Database Stats">
               <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
               <span>Database Stats</span>
@@ -81,18 +85,23 @@
             <div class="app-version">v{{ appVersion }}</div>
         </div>
       </aside>
-      <main class="main-content">
-        <keep-alive include="Home">
-          <component 
-            :is="currentComponent" 
-            :user="user"
-            @reviewed="goToHome"
-            @check-in-at="reviewAt"
-            @review-at="reviewAt"
-            @go-to-review="goToReview"
-            :selected-restaurant-id="selectedRestaurantForReview"
-          />
-        </keep-alive>
+  <main class="main-content">
+        <div v-if="!sharedReviewId" class="component-wrapper">
+          <keep-alive include="Home">
+            <component 
+              :is="currentComponent" 
+              :user="user"
+              @reviewed="goToHome"
+              @check-in-at="reviewAt"
+              @review-at="reviewAt"
+              @go-to-review="goToReview"
+              :selected-restaurant-id="selectedRestaurantForReview"
+            />
+          </keep-alive>
+        </div>
+        <div v-else class="component-wrapper empty-state">
+          <!-- Empty state while modal is shown -->
+        </div>
       </main>
       <ReviewDetailModal 
         v-if="sharedReviewId"
@@ -117,6 +126,8 @@ import Leaderboard from './components/Leaderboard.vue';
 import Followers from './components/Followers.vue';
 import BucketList from './components/BucketList.vue';
 import Following from './components/Following.vue';
+import Help from './components/Help.vue';
+import Profile from './components/Profile.vue';
 import ReviewDetailModal from './components/ReviewDetailModal.vue';
 import Toast from './components/Toast.vue';
 import { resetMetaTags } from './utils/meta.js';
@@ -138,7 +149,9 @@ export default {
     MyReviews,
     Leaderboard,
     Followers,
+    Profile,
     Following,
+    Help,
     ReviewDetailModal,
     Toast
   },
@@ -156,7 +169,7 @@ export default {
 
     const protectedPages = new Set([
       'review', 'user-search', 'bucket-list', 'my-reviews', 
-      'followers', 'following', 'database-stats'
+      'followers', 'following', 'database-stats', 'profile'
     ]);
 
     const componentMap = {
@@ -170,7 +183,9 @@ export default {
       'leaderboard': 'Leaderboard',
       'database-stats': 'DatabaseStats',
       'followers': 'Followers',
-      'following': 'Following'
+      'following': 'Following',
+      'help': 'Help',
+      'profile': 'Profile'
     };
     const currentComponent = computed(() => componentMap[currentPage.value] || 'Home');
 
@@ -265,36 +280,52 @@ export default {
       currentPage.value = 'bucket-list';
     };
 
+    const goToHelp = () => {
+      currentPage.value = 'help';
+    };
+
+    const goToProfile = () => {
+      currentPage.value = 'profile';
+    };
+
     const reviewAt = (restaurantId) => {
       selectedRestaurantForReview.value = restaurantId;
       currentPage.value = 'review';
     };
 
     const handleDeepLink = () => {
-      // Check for new format: /review/{reviewId}
-      const pathMatch = window.location.pathname.match(/\/review\/([^\/]+)/);
-      if (pathMatch) {
+      // Check for path-based format: /review/{reviewId}
+      const pathMatch = window.location.pathname.match(/\/review\/([^\/\?]+)/);
+      if (pathMatch && pathMatch[1]) {
         const reviewId = pathMatch[1];
-        if (reviewId) {
-          sharedReviewId.value = reviewId;
-          currentPage.value = 'home';
-          // Clean up URL without reloading
-          window.history.replaceState(null, '', '/');
-          return;
-        }
+        console.log('Deep link detected in path with review ID:', reviewId);
+        console.log('Setting sharedReviewId...');
+        sharedReviewId.value = reviewId;
+        console.log('sharedReviewId is now:', sharedReviewId.value);
+        return;
       }
       
-      // Check for old hash format: #review/{reviewId} (for backward compatibility)
+      // Check for query parameter format: ?review={reviewId}
+      const urlParams = new URLSearchParams(window.location.search);
+      const reviewId = urlParams.get('review');
+      if (reviewId) {
+        console.log('Deep link detected with query param review ID:', reviewId);
+        console.log('Setting sharedReviewId...');
+        sharedReviewId.value = reviewId;
+        console.log('sharedReviewId is now:', sharedReviewId.value);
+        return;
+      }
+      
+      // Also check for hash format: #review/{reviewId}
+      // For backward compatibility with old share links
       const hash = window.location.hash;
-      const reviewMatch = hash.match(/#review\/([^/]+)/);
-      if (reviewMatch) {
-        const reviewId = reviewMatch[1];
-        if (reviewId) {
-          sharedReviewId.value = reviewId;
-          // Navigate to home so sidebar works correctly
-          currentPage.value = 'home';
-          // Update to new URL format
-          window.history.replaceState(null, '', `/review/${reviewId}`);
+      if (hash) {
+        const reviewMatch = hash.match(/#review\/([^/\?]+)/);
+        if (reviewMatch && reviewMatch[1]) {
+          const hashReviewId = reviewMatch[1];
+          console.log('Deep link detected with hash review ID:', hashReviewId);
+          sharedReviewId.value = hashReviewId;
+          return;
         }
       }
     };
@@ -302,21 +333,31 @@ export default {
     const closeReviewModal = () => {
       sharedReviewId.value = null;
       resetMetaTags();
+      // Clean up URL after modal closes
+      window.history.replaceState(null, '', '/');
     };
 
     onMounted(() => {
-      // Check for deep links on mount
+      console.log('App mounted, checking for deep links...');
+      console.log('Current URL:', window.location.href);
+      console.log('Current search params:', window.location.search);
+      
+      // Check for deep links immediately
       handleDeepLink();
       
       // Listen for hash changes (in case user navigates with back/forward)
       window.addEventListener('hashchange', handleDeepLink);
+      
+      // Also listen for popstate (back/forward navigation)
+      window.addEventListener('popstate', handleDeepLink);
     });
 
     onUnmounted(() => {
       window.removeEventListener('hashchange', handleDeepLink);
+      window.removeEventListener('popstate', handleDeepLink);
     });
 
-    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, sharedReviewId, closeReviewModal };
+    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, goToHelp, goToProfile, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, sharedReviewId, closeReviewModal };
   }
 }; 
 </script>

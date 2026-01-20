@@ -10,7 +10,9 @@ Welcome to **PorkHub** — your community-driven platform for discovering, ratin
 2. [Navigation](#navigation)
 3. [Core Features](#core-features)
 4. [User Accounts & Social](#user-accounts--social)
-5. [Tips & Best Practices](#tips--best-practices)
+5. [Gamification & Social Features](#-gamification--social-features)
+6. [Tips & Best Practices](#tips--best-practices)
+7. [Frequently Asked Questions](#frequently-asked-questions)
 
 ---
 
@@ -18,54 +20,56 @@ Welcome to **PorkHub** — your community-driven platform for discovering, ratin
 
 ### Logging In
 
-When you first visit PorkHub, you'll see a login button in the sidebar. Click **"Login with Google"** to access your account using your Google credentials. Once logged in, your profile information will appear in the sidebar.
+When you first visit PorkHub, you'll see a **"Login with Google"** button at the bottom of the sidebar. Click it to access your account using your Google credentials. Once logged in, your profile information (name and avatar) will appear at the top of the sidebar, and you'll unlock all member-only features.
 
 ### What You Can Do Without Logging In
 
 - Browse the **Home** feed
 - View the **Leaderboard**
-- Explore **Restaurants**
+- Explore **Restaurants** and view their reviews
 - View **Recommendations**
+- Search for users
 
 ### What Requires Login
 
 - Write and submit reviews
 - Follow other users
+- Like reviews and add comments
 - Manage your bucket list
-- View your reviews and followers/following lists
+- View and edit your own reviews
+- Share reviews with others
 
 ---
 
 ## Navigation
 
-The **sidebar** on the left is your main navigation hub. Click the hamburger menu icon (three horizontal lines) to collapse/expand the sidebar. The main navigation links include:
+The **sidebar** on the left is your main navigation hub. Click the **hamburger menu icon** (three horizontal lines) to collapse/expand the sidebar for more screen space.
 
 ### Public Pages (Available to Everyone)
 
-| Page | Icon | Purpose |
-|------|------|---------|
-| **Home** | 🏠 | Your personalized feed of reviews from followed users and recent activity |
-| **Leaderboard** | 📊 | Top-ranked reviewers and contributors in the community |
-| **Restaurants** | 🏪 | Browse all restaurants, search by name/address/city, and manage listings |
-| **Recommendations** | ⭐ | Personalized restaurant recommendations based on community reviews |
+| Page | Purpose |
+|------|---------|
+| **Home** | Your personalized feed of reviews from followed users and recent activity, with options to sort by Most Recent or Nearby |
+| **Leaderboard** | Top-ranked reviewers in the community, ranked by activity and reputation |
+| **Restaurants** | Browse and search all restaurants, view details, and see reviews |
+| **Recommendations** | Discover new restaurants based on highly-rated reviews from the community |
 
 ### Account-Only Pages (Requires Login)
 
-| Page | Icon | Purpose |
-|------|------|---------|
-| **Write a Review** | 📍 | Submit a new review for a restaurant you've visited |
-| **Follow Users** | 🔍 | Search for and follow other reviewers |
-| **My Bucket List** | 🪣 | Track restaurants you want to visit |
-| **My Reviews** | 📋 | View and manage all your submitted reviews |
-| **My Followers** | 👥 | See who is following you |
-| **Following** | 👤 | View the users you're following |
+| Page | Purpose |
+|------|---------|
+| **Write a Review** | Submit a new review for a restaurant you've visited |
+| **Follow Users** | Search for and follow other reviewers |
+| **My Bucket List** | Track restaurants you want to visit |
+| **My Reviews** | View and manage all your submitted reviews |
+| **My Followers** | See who is following your reviews |
+| **Following** | View the users you're following |
 
 ### Admin-Only Pages
 
 | Page | Purpose |
 |------|---------|
 | **Database Stats** | View statistics about the community database |
-| **Backfill Reviews** | Administrative tool for data maintenance |
 
 ---
 
@@ -73,22 +77,25 @@ The **sidebar** on the left is your main navigation hub. Click the hamburger men
 
 ### 🏠 Home Feed
 
-The **Home** page displays a personalized feed based on your activity.
+The **Home** page displays a personalized feed of reviews from users you follow.
 
 **Features:**
 - See recent reviews from users you follow
+- **Location Permission:** On your first visit, you may be prompted to share your location. This unlocks the "Nearby" sorting feature
 - **Sort by:**
   - **Most Recent** — Shows the newest reviews first
-  - **Nearby** — Shows restaurants closest to your current location (requires location permission)
-- **Location Access:** The first time you visit, you may be prompted to share your location. This enables the "Nearby" feature.
-- **Post Actions:**
-  - View restaurant details
-  - Add restaurants to your bucket list (heart icon)
-  - Leave comments on reviews
-  - View the reviewer's profile
+  - **Nearby** — Shows restaurants closest to your current location (requires location permission and enabled sorting)
+  - Distance is displayed in miles when location is available
+
+**Review Actions:**
+- **Like** — Click the heart icon to like a review (requires login)
+- **Share** — Share the review using the share button
+- **Comment** — Add comments to reviews to engage with other reviewers
+- **Bucket List** — Add restaurants to your bucket list with the heart icon
+- **View Details** — Click the restaurant name to view full restaurant details
 
 **Empty Feed?**
-If your feed is empty, follow some users or check out the Restaurants page to discover new places.
+If your feed is empty, follow some users first, or check out the Restaurants page to discover new places.
 
 ---
 
@@ -96,10 +103,10 @@ If your feed is empty, follow some users or check out the Restaurants page to di
 
 View the community's top contributors ranked by their activity and reputation.
 
-**How It Works:**
-- Users are ranked based on the number and quality of their reviews
-- See badges/medals next to top reviewers' names
-- Click on a user to see their profile and reviews
+**What You See:**
+- Users ranked by number of reviews and community engagement
+- Medals or badges displayed next to top reviewers
+- Click on a user to view their profile and all their reviews
 
 ---
 
@@ -107,26 +114,21 @@ View the community's top contributors ranked by their activity and reputation.
 
 Browse, search, and manage restaurant listings.
 
-**Search:**
-- Search by restaurant name, address, city, state, or ZIP code
+**Searching:**
+- Search by restaurant **name**, **address**, **city**, **state**, or **ZIP code**
 - Results update as you type
+- See average ratings and review counts for each restaurant
+- Distance to each restaurant displayed (when location is enabled)
 
-**Features:**
-- **View Details** — Click any restaurant to see its full profile, including:
-  - Address and contact information
-  - Website link
-  - Average rating
-  - All reviews and comments
-  - Current bucket list count
-  
-- **Add Review** — Click "Write a Review" on any restaurant card
-  
-- **Edit Restaurant Info** (Admin only) — Update restaurant details
-  
+**What You Can Do:**
+- **View Reviews** — Click the comments icon to see all reviews for a restaurant
+- **Add Review** — Click "View Reviews" then "Write a Review" button
+- **Bucket List** — Click the bucket/heart icon to save restaurants you want to visit (requires login)
+- **Edit Details** (Admin only) — Update restaurant information
 - **Add New Restaurant** (Logged-in users) — Click "Add New Restaurant" to submit a new location:
-  - Fill in name, address, city, state, ZIP code
-  - Optionally add website URL
-  - Submit for community approval
+  - Enter name, address, city, state, and ZIP code
+  - Optionally add the restaurant's website URL
+  - Submit your entry
 
 ---
 
@@ -136,20 +138,23 @@ Submit detailed reviews for restaurants you've visited.
 
 **To Write a Review:**
 1. Click **"Write a Review"** in the sidebar
-2. Select a restaurant or search for one
+2. Choose a restaurant from the dropdown or add a new one
 3. Fill in your review details:
    - **Star Rating** — Rate from 1-5 stars
    - **Review Title** — Short summary of your experience
    - **Review Text** — Detailed comments about the food, service, atmosphere, etc.
-   - **Tags** — Add tags (e.g., "worth-the-wait", "family-friendly", "authentic")
+   - **Tags** — Add tags to categorize your experience (e.g., "worth-the-wait", "family-friendly", "authentic")
    - **Visit Date** — When you visited
+   - **Photo** — Optionally take a photo with your camera or upload one from your device
 
 4. Click **"Submit Review"**
 
 **Tips:**
-- Be honest and constructive in your feedback
-- Use tags to help other users quickly understand key characteristics
-- Include specific details that would help other diners
+- Be specific and constructive in your feedback
+- Include details about flavors, portions, preparation, and service
+- Mention the occasion (family dinner, quick lunch, date night, etc.)
+- Use tags to help others quickly understand the experience
+- Review soon after your visit while details are fresh
 
 ---
 
@@ -158,9 +163,9 @@ Submit detailed reviews for restaurants you've visited.
 Discover new restaurants based on community reviews.
 
 **How It Works:**
-- Algorithm analyzes highly-rated reviews from followed users
-- Shows personalized suggestions based on your interests
-- See why each restaurant is recommended (based on reviews you liked)
+- Analyzes highly-rated reviews from users you follow
+- Shows personalized restaurant suggestions
+- Recommendations are tailored based on the reviews and ratings in the community
 
 ---
 
@@ -170,14 +175,14 @@ Find and follow other PorkHub members to personalize your feed.
 
 **To Follow a User:**
 1. Click **"Follow Users"** in the sidebar
-2. Search for a username or browse members
-3. View their profile and recent reviews
+2. Search for a username to find members
+3. View their profile showing recent reviews and activity
 4. Click **"Follow"** to add them to your following list
 
 **Benefits:**
 - Your Home feed will include their reviews
-- You'll see their activity and ratings
-- Build a community of trusted reviewers
+- See their ratings and activity
+- Build a community of reviewers with similar tastes
 
 ---
 
@@ -186,11 +191,15 @@ Find and follow other PorkHub members to personalize your feed.
 Create and manage a list of restaurants you want to visit.
 
 **Managing Your List:**
-- Click the **heart icon** on any restaurant card to add/remove from bucket list
-- View all bookmarked restaurants in **"My Bucket List"**
-- See distance to each restaurant (if location is enabled)
-- Check previous reviews and ratings before visiting
+- Click the **heart icon** on any restaurant card or in the feed to add/remove from bucket list
+- View all saved restaurants in **"My Bucket List"**
+- See distance to each restaurant (when location is enabled)
+- View previous reviews and ratings before visiting
 - Remove restaurants once you've visited and reviewed them
+
+**Quick Actions:**
+- Check recent reviews to see current conditions
+- View the restaurant's website (if available) for hours and menu updates
 
 ---
 
@@ -199,28 +208,34 @@ Create and manage a list of restaurants you want to visit.
 View and manage all your submitted reviews.
 
 **Features:**
+- See all reviews you've written with their ratings and engagement
+- **Edit** — Update your review text, rating, tags, or photo
+- **Delete** — Remove a review (this action cannot be undone)
+- **Share** — Share individual reviews with others
+- View how many likes and comments each review has received
+- See all reviews sorted by date
+
+**Features:**
 - See all reviews you've written
 - **Edit** — Update your review text, rating, or tags
 - **Delete** — Remove a review (be careful, this cannot be undone)
 - Filter by restaurant or date
 - See engagement (comments and reactions) on each review
 
----
-
 ### 👥 My Followers / 👤 Following
 
 Manage your social connections.
 
 **My Followers:**
-- See who is following your reviews
-- View each follower's recent activity
-- Click to visit their profile
+- See all users who are following your reviews
+- View each follower's profile and recent activity
+- Click to view all their reviews
 
 **Following:**
 - View all users you're following
-- See their latest reviews
-- Unfollow if desired
-- Explore their bucket lists
+- See previews of their latest reviews and ratings
+- Unfollow users by clicking the unfollow button
+- Click on a user to view their full profile and all their reviews
 
 ---
 
@@ -228,23 +243,113 @@ Manage your social connections.
 
 ### Your Profile
 
-Your profile appears in the sidebar and shows:
-- Profile photo (from Google account)
-- Display name
+Your profile appears in the sidebar and displays:
+- Your profile photo (from your Google account)
+- Your display name
 - Badge/medal (if you're a top reviewer)
+
+When you log out, you'll see a **"Login with"** button to sign back in.
 
 ### Comments & Interaction
 
 **Adding Comments:**
-- On any review post, you can add comments
-- Comments appear below the review for other users to see
-- Engage in discussions about restaurants and experiences
+- Click on any review to expand it and see the comments section
+- Type your comment and submit to engage with other reviewers
+- Comments appear immediately for all users to see
+- Engage in discussions about restaurants and dining experiences
 
-**View Profiles:**
-- Click on any username to see their profile
+**Liking Reviews:**
+- Click the heart icon on any review to like it (requires login)
+- Like counts are displayed on each review
+- Your likes help promote helpful reviews
+
+**Sharing Reviews:**
+- Click the share icon on any review to share it
+- Share via your device's native sharing options, email, social media, or copy the link to clipboard
+- Shared reviews include all details (rating, text, photo, tags) when opened by others
+
+**View User Profiles:**
+- Click on any username to see their complete profile
 - View their review history
 - Check out their recent activity
-- Follow them if interested
+- Follow them if interested in their reviews
+
+---
+
+## 🎮 Gamification & Social Features
+
+### 🏆 Badges & Achievements
+
+Earn badges by reaching milestones in your PorkHub journey! Your badges are displayed on your profile and show your achievements to the community.
+
+**Available Badges:**
+
+- **10 Reviews** 🥉 - Written 10 reviews
+- **25 Reviews** 🥈 - Written 25 reviews
+- **50 Reviews** 🥇 - Written 50 reviews
+- **100 Reviews** 👑 - Written 100 reviews
+- **Photo Master** 📸 - Written 10+ reviews with photos
+- **All 50 States** 🗺️ - Reviewed restaurants in all 50 US states
+
+**Tracking Your Progress:**
+
+Visit the Home page after logging in to see your personal statistics:
+- Total reviews written
+- Photo reviews count
+- States visited
+- Follower count
+- Visual progress bars showing your progress toward the next badge
+
+### 📊 Trending Restaurants
+
+See which restaurants are getting the most attention and highest ratings this week!
+
+**Two Trending Views:**
+
+- **Most Reviewed** 🔥 - Shows restaurants that received the most new reviews this week. See what's popular in your area!
+- **Highest Rated** ⭐ - Shows top-rated restaurants based on reviews from this week. Discover quality dining experiences!
+
+Each trending restaurant shows:
+- Current ranking (#1, #2, #3, etc.)
+- Restaurant name and location
+- Number of new reviews or average rating
+- Quick access button to view full details
+
+### 👥 Follow Recommendations
+
+Discover reviewers with similar tastes and interests!
+
+**How Follow Recommendations Work:**
+
+- Analyzes users that people you follow are also following
+- Shows suggested users ranked by mutual connections and review quality
+- Displays why we recommend each user (e.g., "Followed by 3 reviewers you know")
+- Shows user badges and review count to help you decide
+
+**Why Follow Quality Reviewers:**
+
+- Your Home feed will feature their reviews
+- Discover restaurants that align with your preferences
+- Build a community of trusted reviewers
+- Engage with like-minded food enthusiasts
+
+### 📰 Activity Feed
+
+Keep up with what your followers are doing!
+
+**What You'll See:**
+
+- Recent reviews from users you follow
+- Real-time activity showing new reviews and badges earned
+- Quick links to view restaurants being reviewed
+- Timestamps showing how long ago reviews were posted
+- Special badges displayed when followers earn achievements
+
+**Tips:**
+
+- Comment on reviews to engage with your followers
+- Share interesting reviews you find
+- Follow active reviewers to stay engaged with the community
 
 ---
 
@@ -252,36 +357,39 @@ Your profile appears in the sidebar and shows:
 
 ### ✅ For Great Reviews
 
-1. **Be Specific** — Instead of "good food," describe flavors, portions, and preparation
-2. **Include Context** — Mention the occasion (family dinner, quick lunch, etc.)
-3. **Balanced Feedback** — Mention both strengths and areas for improvement
-4. **Use Tags** — Help categorize your experience for others
-5. **Be Timely** — Review soon after your visit while details are fresh
+1. **Be Specific** — Instead of "good food," describe the breaded pork tenderloin, flavors, preparation, and portion size
+2. **Include Context** — Mention the occasion (family dinner, quick lunch, date night, etc.)
+3. **Balanced Feedback** — Note both strengths (great breading, generous portions) and areas for improvement
+4. **Use Tags** — Categorize your experience (e.g., "crispy-exterior", "family-friendly", "generous-portion", "authentic")
+5. **Add a Photo** — Include a photo of your meal to help others see what to expect
+6. **Be Timely** — Review soon after your visit while details are fresh in your mind
 
 ### 📍 Location Tips
 
-1. **Enable Location** — Accept the location prompt on Home to see "Nearby" sorting
-2. **Privacy** — Your location is only used to calculate distances; it's not stored
-3. **Better Recommendations** — Location data helps show you closer options
+1. **Enable Location** — Accept the location prompt on the Home page to unlock the "Nearby" sorting feature
+2. **Privacy** — Your location is only used to calculate distances to restaurants and is not stored permanently
+3. **Better Results** — Location data helps show you restaurants closest to you and sorts your feed accordingly
 
 ### 👥 Following Strategy
 
-1. **Follow Quality Reviewers** — Find users whose taste aligns with yours
-2. **Build Your Feed** — Start with a few followers and expand gradually
-3. **Engage** — Comment on reviews and share your thoughts
+1. **Follow Quality Reviewers** — Find users whose tastes align with yours
+2. **Build Your Feed Gradually** — Start with a few followers and expand over time
+3. **Engage** — Comment on reviews and share your thoughts to build community connections
+4. **Explore Profiles** — Click on reviewers from the Leaderboard to find high-quality contributors
 
-### 🍽️ Before Visiting
+### 🍽️ Before Visiting a Restaurant
 
-1. Check **My Bucket List** for distance and reviews
-2. Read the **latest reviews** to see current conditions
-3. Check the **website** link for hours and menu updates
-4. Read **recent comments** for tips and warnings
+1. Check **My Bucket List** to see the distance and view saved restaurants
+2. Read the **latest reviews** to see current conditions and recent experiences
+3. Check the **restaurant's website** (if available) for hours and menu updates
+4. Read **recent comments** on reviews for tips and warnings from other reviewers
 
 ### 🔍 Search Tips
 
-- Search by **full address** for accuracy
-- Use **city names** for broad searches
-- Search by **ZIP code** to find restaurants in a specific area
+- Search by **restaurant name** for direct matches
+- Use **address** searches for accuracy when multiple restaurants have similar names
+- Try **city names** for broad searches in a specific area
+- Search by **ZIP code** to find restaurants in a specific neighborhood
 - Try **partial names** if you're unsure of the exact spelling
 
 ---
@@ -289,25 +397,43 @@ Your profile appears in the sidebar and shows:
 ## Frequently Asked Questions
 
 **Q: Is there a cost to use PorkHub?**
-A: No! PorkHub is completely free to use.
+A: No! PorkHub is completely free to use and enjoy.
 
-**Q: How do badges/medals work?**
-A: Top reviewers (based on activity and community engagement) earn badges displayed next to their name.
+**Q: How does the Leaderboard work?**
+A: Users are ranked based on the number of reviews they've written and community engagement. Top reviewers earn badges or medals.
 
 **Q: Can I delete my account?**
-A: Contact support for account deletion requests. You can delete individual reviews at any time.
+A: You can delete individual reviews at any time. For full account deletion requests, please contact support.
 
 **Q: What if I see incorrect restaurant information?**
-A: Click the edit button on the restaurant card (admin-only currently) or leave a comment noting the error.
+A: Admins can edit restaurant details directly. If you spot an error, you can also leave a comment noting the issue.
 
-**Q: How are recommendations calculated?**
-A: Recommendations are based on highly-rated reviews from users you follow and similar community members.
+**Q: How are Recommendations calculated?**
+A: Recommendations are based on highly-rated reviews from users in the community and users you follow.
 
-**Q: Can I make my reviews private?**
-A: All reviews are public to encourage community engagement. You can delete reviews if desired.
+**Q: Are all reviews public?**
+A: Yes, all reviews are public to encourage community engagement and help others discover great restaurants. You can delete reviews if desired.
+
+**Q: Can I edit my review after posting?**
+A: Yes! Go to "My Reviews" and click the edit button on any review to update your text, rating, tags, or photo.
 
 **Q: How do I report inappropriate content?**
 A: Contact support with details about the concerning review or comment.
+
+**Q: Do you collect my location data?**
+A: Your location is only used temporarily to calculate distances and sort the feed nearby. It's not stored permanently in your profile.
+
+**Q: Can I search for restaurants without logging in?**
+A: Yes! The Restaurants page is available to all users. You only need to log in to write reviews, follow users, or like reviews.
+
+**Q: How do I earn badges?**
+A: Badges are earned automatically as you reach milestones! Write more reviews, include photos, and visit restaurants in different states to unlock achievements. Check your stats on the Home page to see your progress toward the next badge.
+
+**Q: Can I see badges earned by other users?**
+A: Yes! When viewing other users' profiles or in the Follow Recommendations section, you can see the badges they've earned. This helps you identify quality reviewers in the community.
+
+**Q: How are trending restaurants calculated?**
+A: We calculate trending restaurants based on activity this week. "Most Reviewed" shows restaurants with the most new reviews, while "Highest Rated" shows restaurants with the best average ratings from recent reviews.
 
 ---
 
@@ -315,5 +441,4 @@ A: Contact support with details about the concerning review or comment.
 
 If you have questions not covered in this guide or encounter issues, please reach out to the PorkHub support team.
 
-Happy reviewing! 🐷🥓
-
+Happy reviewing and pork tenderloin hunting! 🐷🥓

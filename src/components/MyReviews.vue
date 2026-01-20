@@ -212,9 +212,9 @@ const toggleLike = async (reviewId) => {
 
 const shareReview = async (reviewId) => {
   const baseUrl = window.location.origin;
-  // Use clean URL format for better social media previews
-  // The Cloud Function will handle /review/{reviewId} format
-  const shareableLink = `${baseUrl}/review/${reviewId}`;
+  // Use query parameter format for better compatibility with social media sharing
+  // The app's handleDeepLink() in App.vue will parse the ?review= query parameter
+  const shareableLink = `${baseUrl}/?review=${reviewId}`;
   
   // Try Web Share API first (mobile-friendly)
   if (navigator.share) {

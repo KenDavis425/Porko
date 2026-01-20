@@ -180,8 +180,8 @@ export default {
         setupLikeListener();
 
         // Update meta tags for social media sharing
-        // Use clean URL format for better social media previews
-        const shareUrl = `${window.location.origin}/review/${review.value.id}`;
+        // Use query parameter format that works with the current routing setup
+        const shareUrl = `${window.location.origin}/?review=${review.value.id}`;
         const shareTitle = `${review.value.userName}'s Review of ${review.value.restaurantName}`;
         const shareDescription = review.value.text 
           ? `"${review.value.text.substring(0, 150)}${review.value.text.length > 150 ? '...' : ''}"` 

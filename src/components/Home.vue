@@ -92,6 +92,26 @@
         <div v-if="loadingMore" class="loading-indicator">Loading more...</div>
       </div>
     </div>
+
+    <!-- Gamification Features Section -->
+    <div v-if="user" class="gamification-features">
+      <div class="features-container">
+        <!-- Trending Restaurants -->
+        <div class="feature-column">
+          <TrendingRestaurants @restaurant-selected="handleRestaurantSelected" />
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="feature-column">
+          <ActivityFeed :user="user" :following="userFollowing" @restaurant-selected="handleRestaurantSelected" />
+        </div>
+
+        <!-- Follow Recommendations -->
+        <div class="feature-column">
+          <FollowRecommendations :user="user" :following="userFollowing" @follow-user="handleFollowUser" />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -101,6 +121,9 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import Comments from './Comments.vue';
 import StarRating from './StarRating.vue';
+import ActivityFeed from './ActivityFeed.vue';
+import TrendingRestaurants from './TrendingRestaurants.vue';
+import FollowRecommendations from './FollowRecommendations.vue';
 import { getDistance } from '../utils/geolocation.js';
 import { showToast } from '../utils/toast.js';
 
@@ -108,7 +131,10 @@ export default {
   name: 'Home',
   components: {
     StarRating,
-    Comments
+    Comments,
+    ActivityFeed,
+    TrendingRestaurants,
+    FollowRecommendations
   },
   props: {
     user: {
@@ -132,6 +158,7 @@ export default {
     const leaderboardRanks = ref(new Map());
     const restaurantsMap = ref(new Map());
     const sortOrder = ref('time'); // 'time' or 'distance'
+    const userFollowing = ref([]); // For gamification features
     let isSettingUpListeners = false; // Guard to prevent concurrent setup
 
     const processAndSetPosts = () => {
@@ -179,6 +206,7 @@ export default {
         }
       });
       checkLocationPermission(); // Now called once on mount.
+      loadUserFollowing(); // Load user's following list for gamification
     });
 
     watch(userLocation, (newLocation) => {
@@ -608,6 +636,40 @@ export default {
       }
     };
 
+    // Gamification event handlers
+    const handleRestaurantSelected = (restaurantId) => {
+      // Could navigate to restaurant details or emit event
+      console.log('Selected restaurant:', restaurantId);
+    };
+
+    const handleFollowUser = ({ userId, isFollowing: nowFollowing }) => {
+      // Update userFollowing list
+      if (nowFollowing) {
+        if (!userFollowing.value.includes(userId)) {
+          userFollowing.value.push(userId);
+        }
+      } else {
+        const index = userFollowing.value.indexOf(userId);
+        if (index > -1) {
+          userFollowing.value.splice(index, 1);
+        }
+      }
+    };
+
+    // Load user's following list on mount
+    const loadUserFollowing = async () => {
+      if (!props.user) return;
+      
+      try {
+        const followsSnap = await getDocs(
+          query(collection(db, 'follows'), where('followerId', '==', props.user.uid))
+        );
+        userFollowing.value = followsSnap.docs.map(doc => doc.data().followingId);
+      } catch (error) {
+        console.error('Error loading following list:', error);
+      }
+    };
+
     return {
       posts,
       loading,
@@ -621,7 +683,11 @@ export default {
       sortOrder,
       setSortOrder,
       toggleLike,
-      shareReview
+      shareReview,
+      userFollowing,
+      handleRestaurantSelected,
+      handleFollowUser,
+      loadUserFollowing
     };
   }
 };
@@ -900,4 +966,40 @@ export default {
   flex-shrink: 0;
   padding-left: 1em;
 }
+
+/* Gamification Section Styles */
+.gamification-section {
+  margin-bottom: 2rem;
+}
+
+.gamification-features {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--background-color);
+}
+
+.features-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.feature-column {
+  background: var(--card-background);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+@media (max-width: 768px) {
+  .features-container {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .feature-column {
+    padding: 1rem;
+  }
+}
+
 </style>
