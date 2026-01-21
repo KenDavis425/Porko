@@ -61,6 +61,7 @@ import { ref, onMounted, computed } from 'vue';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { calculateEarnedBadges, BADGES } from '../utils/badges';
+import { showToast } from '../utils/toast.js';
 import BadgeDisplay from './BadgeDisplay.vue';
 
 export default {
@@ -95,6 +96,7 @@ export default {
         // Count photo reviews and collect states from restaurants
         let photoReviewCount = 0;
         const statesVisited = new Set();
+        const reviewsByState = {};
         
         for (const review of reviews) {
           if (review.photoURL) {
@@ -109,7 +111,9 @@ export default {
               if (restaurantSnap.exists()) {
                 const restaurantData = restaurantSnap.data();
                 if (restaurantData.state) {
-                  statesVisited.add(restaurantData.state.toUpperCase());
+                  const state = restaurantData.state.toUpperCase();
+                  statesVisited.add(state);
+                  reviewsByState[state] = (reviewsByState[state] || 0) + 1;
                 }
               }
             } catch (error) {
@@ -123,15 +127,62 @@ export default {
           query(collection(db, 'follows'), where('followingId', '==', props.user.uid))
         );
 
-        stats.value = {
+        // Get all reviews to check for first-to-review badges
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const allReviews = allReviewsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+        // Count first-to-review achievements
+        let firstReviewCount = 0;
+        const restaurantReviewMap = {};
+        allReviews.forEach(review => {
+          if (!restaurantReviewMap[review.restaurantId]) {
+            restaurantReviewMap[review.restaurantId] = [];
+          }
+          restaurantReviewMap[review.restaurantId].push(review);
+        });
+
+        reviews.forEach(userReview => {
+          const restaurantReviews = restaurantReviewMap[userReview.restaurantId] || [];
+          if (restaurantReviews.length > 0) {
+            // Sort by timestamp to find the first review
+            const sorted = restaurantReviews.sort((a, b) => {
+              const timeA = a.createdAt?.toMillis?.() || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+              const timeB = b.createdAt?.toMillis?.() || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+              return timeA - timeB;
+            });
+            if (sorted[0].userId === props.user.uid) {
+              firstReviewCount++;
+            }
+          }
+        });
+
+        const newStats = {
           reviewCount: reviews.length,
           photoReviewCount,
           statesVisited,
-          followerCount: followersSnap.docs.length
+          reviewsByState,
+          firstReviews: firstReviewCount,
+          followerCount: followersSnap.docs.length,
+          uid: props.user.uid
         };
 
-        // Calculate earned badges
-        earnedBadges.value = calculateEarnedBadges(stats.value);
+        // Calculate newly earned badges and show notifications
+        const previousBadges = new Set(earnedBadges.value);
+        const newBadges = calculateEarnedBadges(newStats);
+        
+        // Show toast notifications for newly earned badges
+        newBadges.forEach(badgeId => {
+          if (!previousBadges.has(badgeId)) {
+            const badge = BADGES[Object.keys(BADGES).find(key => BADGES[key].id === badgeId)];
+            if (badge) {
+              showToast(`🎉 Congratulations! You earned the ${badge.name} badge! ${badge.emoji}`, 'success', 3000);
+            }
+          }
+        });
+
+        stats.value = newStats;
+        earnedBadges.value = newBadges;
+
       } catch (error) {
         console.error('Error loading user stats:', error);
       } finally {

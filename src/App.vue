@@ -13,7 +13,12 @@
           </div>
           <div v-if="user" class="sidebar-header">
             <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" class="sidebar-avatar" alt="User Avatar" referrerpolicy="no-referrer" @click="goToProfile" style="cursor: pointer;" title="View Your Profile" />
-            <div class="sidebar-user">{{ user.displayName }}</div>
+            <div class="sidebar-user">
+              <div class="sidebar-user-name">{{ user.displayName }}</div>
+              <div v-if="userBadges && userBadges.length > 0" class="sidebar-badges">
+                <BadgeDisplay :badges="userBadges" :title="''" />
+              </div>
+            </div>
           </div>
           <nav class="sidebar-nav">
             <button class="sidebar-link" :class="{ 'active': currentPage === 'home' }" @click="goToHome" title="Home">
@@ -130,6 +135,8 @@ import Help from './components/Help.vue';
 import Profile from './components/Profile.vue';
 import ReviewDetailModal from './components/ReviewDetailModal.vue';
 import Toast from './components/Toast.vue';
+import BadgeDisplay from './components/BadgeDisplay.vue';
+import { calculateEarnedBadges, formatUserStats } from './utils/badges';
 import { resetMetaTags } from './utils/meta.js';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { onAuthStateChanged } from "firebase/auth";
@@ -153,7 +160,8 @@ export default {
     Following,
     Help,
     ReviewDetailModal,
-    Toast
+    Toast,
+    BadgeDisplay
   },
   setup() {
     const user = ref(null);
@@ -162,6 +170,7 @@ export default {
     const isSidebarCollapsed = ref(window.innerWidth < 768);
     const appVersion = ref(process.env.VUE_APP_VERSION || 'dev');
     const sharedReviewId = ref(null);
+    const userBadges = ref([]);
 
     const isAdmin = computed(() => {
       return user.value && user.value.email === 'kennected.com@gmail.com';
@@ -197,6 +206,30 @@ export default {
       isSidebarCollapsed.value = window.innerWidth < 768;
     });
 
+    const loadUserBadges = async (uid) => {
+      try {
+        // Fetch user reviews
+        const reviewsRef = collection(db, 'reviews');
+        const reviewsQuery = query(reviewsRef, where('userId', '==', uid));
+        const reviewsDocs = await getDocs(reviewsQuery);
+        const userReviews = reviewsDocs.docs.map(doc => doc.data());
+        
+        // Fetch all reviews for first-to-review detection
+        const allReviewsQuery = query(reviewsRef);
+        const allReviewsDocs = await getDocs(allReviewsQuery);
+        const restaurantReviews = allReviewsDocs.docs.map(doc => doc.data());
+        
+        // Calculate user stats and earned badges
+        const userDocRef = doc(db, 'users', uid);
+        const userDoc = await getDoc(userDocRef);
+        const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+        const badges = calculateEarnedBadges(userStats);
+        userBadges.value = badges;
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+      }
+    };
+
     onAuthStateChanged(auth, async (u) => {
       user.value = u;
       if (u) { // User is logged in
@@ -213,10 +246,13 @@ export default {
               reviewCount: 0
             });
           }
+          // Load user badges after setting up user document
+          await loadUserBadges(u.uid);
         } catch (error) {
           console.error('Error checking/creating user document:', error);
         }
       } else { // User is logged out or a guest
+        userBadges.value = [];
         // If they were on a protected page, redirect to home
         if (protectedPages.has(currentPage.value)) {
           currentPage.value = 'home';
@@ -357,7 +393,7 @@ export default {
       window.removeEventListener('popstate', handleDeepLink);
     });
 
-    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, goToHelp, goToProfile, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, sharedReviewId, closeReviewModal };
+    return { user, loginWithGoogle, logout, currentPage, goToHome, goToRestaurants, goToUserSearch, goToReview, goToMyReviews, goToRecommendations, goToLeaderboard, goToDatabaseStats, goToFollowers, goToFollowing, goToBucketList, goToHelp, goToProfile, reviewAt, selectedRestaurantForReview, isSidebarCollapsed, toggleSidebar, isAdmin, currentComponent, appVersion, sharedReviewId, closeReviewModal, userBadges };
   }
 }; 
 </script>
@@ -587,5 +623,63 @@ body {
 
 .login-btn-sidebar:hover {
   background-color: #2980b9;
+}
+
+.sidebar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.sidebar-user-name {
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.sidebar-badges {
+  width: 100%;
+  padding: 0.5em 0;
+}
+
+.sidebar-badges :deep(.badges-container) {
+  margin: 0;
+  padding: 0.5em;
+  background: linear-gradient(135deg, #fffde7 0%, #fff9c4 100%);
+  border: 1px solid #fdd835;
+  border-radius: 6px;
+}
+
+.sidebar-badges :deep(.badges-title) {
+  display: none;
+}
+
+.sidebar-badges :deep(.badges-list) {
+  display: flex;
+  gap: 0.4em;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sidebar-badges :deep(.badge-item) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2em;
+  padding: 0.4em;
+}
+
+.sidebar-badges :deep(.badge-emoji) {
+  font-size: 1.5em;
+}
+
+.sidebar-badges :deep(.badge-name) {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-badges :deep(.badge-emoji) {
+    font-size: 1.2em;
+  }
 }
 </style>

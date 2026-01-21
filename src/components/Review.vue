@@ -34,7 +34,10 @@
           </div>
           <div class="form-group">
             <label for="new-rest-state">State</label>
-            <input id="new-rest-state" v-model="newRestaurant.state" type="text">
+            <select id="new-rest-state" v-model="newRestaurant.state">
+              <option value="">-- Select a State --</option>
+              <option v-for="state in usStates" :key="state" :value="state">{{ state }}</option>
+            </select>
           </div>
           <div class="form-group">
             <label for="new-rest-zip">Zip Code</label>
@@ -169,6 +172,14 @@ export default {
   },
   emits: ['reviewed'],
   setup(props, { emit }) {
+    const usStates = [
+      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    ];
+    
     const restaurants = ref([]);
     const selectedRestaurant = ref(props.selectedRestaurantId || null);
     const rating = ref(null);
@@ -511,6 +522,7 @@ export default {
     };
 
     return {
+      usStates,
       restaurants,
       selectedRestaurant,
       rating,

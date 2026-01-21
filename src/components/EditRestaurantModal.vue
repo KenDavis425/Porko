@@ -17,7 +17,10 @@
         </div>
         <div class="form-group">
           <label for="state">State</label>
-          <input id="state" v-model="editableRestaurant.state" type="text">
+          <select id="state" v-model="editableRestaurant.state">
+            <option value="" disabled>State</option>
+            <option v-for="state in usStates" :key="state" :value="state">{{ state }}</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="zip">Zip Code</label>
@@ -51,6 +54,14 @@ export default {
   setup(props, { emit }) {
     const editableRestaurant = ref(null);
 
+    const usStates = [
+      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    ];
+
     watch(() => props.restaurant, (newVal) => {
       if (newVal) {
         // Create a deep copy to avoid mutating the prop directly
@@ -64,7 +75,8 @@ export default {
 
     return {
       editableRestaurant,
-      onSave
+      onSave,
+      usStates
     };
   }
 };
@@ -99,7 +111,7 @@ export default {
   margin-bottom: 0.5em;
   font-weight: 600;
 }
-.form-group input {
+.form-group input, .form-group select {
   width: 100%;
   padding: 10px;
   border-radius: 8px;

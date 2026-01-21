@@ -39,7 +39,7 @@
         </div>
         <div class="form-group-row">
           <div class="form-group"><label for="new-city">City</label><input id="new-city" type="text" v-model="newRestaurant.city" /></div>
-          <div class="form-group"><label for="new-state">State</label><input id="new-state" type="text" v-model="newRestaurant.state" /></div>
+          <div class="form-group"><label for="new-state">State</label><select id="new-state" v-model="newRestaurant.state"><option value="">-- Select a State --</option><option v-for="state in usStates" :key="state" :value="state">{{ state }}</option></select></div>
           <div class="form-group"><label for="new-zip">Zip</label><input id="new-zip" type="text" v-model="newRestaurant.zip" /></div>
         </div>
         <div class="form-group">
@@ -117,6 +117,14 @@ export default {
     }
   },
   setup(props) {
+    const usStates = [
+      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    ];
+    
     const restaurants = ref([]);
     const rawReviews = ref([]);
     const loading = ref(true);
@@ -444,6 +452,7 @@ export default {
     };
 
     return {
+      usStates,
       user: props.user,
       loading,
       searchQuery,
@@ -530,12 +539,15 @@ export default {
   margin-bottom: 0.5em;
   font-weight: 600;
 }
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #ccc;
   box-sizing: border-box;
+  font-family: inherit;
+  font-size: 1em;
 }
 .loading-indicator, .no-restaurants-message {
   text-align: center;

@@ -56,6 +56,38 @@ export const BADGES = {
     emoji: '🗺️',
     requirement: (stats) => stats.statesVisited && stats.statesVisited.size === 50,
     category: 'geographic'
+  },
+
+  // Regional Mastery Badges
+  ILLINOIS_MASTER: {
+    id: 'illinois-master',
+    name: 'Illinois Master',
+    description: 'Written 10+ reviews in Illinois',
+    emoji: '🏛️',
+    requirement: (stats) => (stats.reviewsByState?.['IL'] || 0) >= 10,
+    category: 'regional'
+  },
+  MIDWEST_EXPLORER: {
+    id: 'midwest-explorer',
+    name: 'Midwest Explorer',
+    description: 'Reviewed in 5+ Midwest states',
+    emoji: '🧭',
+    requirement: (stats) => {
+      const midwestStates = ['IL', 'IN', 'IA', 'KS', 'MI', 'MN', 'MO', 'NE', 'ND', 'OH', 'SD', 'WI'];
+      const visitedMidwest = midwestStates.filter(state => (stats.reviewsByState?.[state] || 0) > 0);
+      return visitedMidwest.length >= 5;
+    },
+    category: 'regional'
+  },
+
+  // Discovery Badge
+  FIRST_TO_REVIEW: {
+    id: 'first-to-review',
+    name: 'First to Review',
+    description: 'Be the first to review a restaurant',
+    emoji: '🚀',
+    requirement: (stats) => (stats.firstReviews || 0) > 0,
+    category: 'discovery'
   }
 };
 
@@ -107,23 +139,54 @@ export function getBadgesByCategory(category) {
  * Used when calculating from Firestore user documents
  * @param {Object} userDoc - Firestore user document
  * @param {Array} userReviews - Array of user's review documents
+ * @param {Array} restaurantReviews - Array of all reviews for restaurants (for first-to-review calculation)
  * @returns {Object} Formatted stats object
  */
-export function formatUserStats(userDoc, userReviews = []) {
+export function formatUserStats(userDoc, userReviews = [], restaurantReviews = []) {
   const stats = {
     reviewCount: userDoc.reviewCount || 0,
     photoReviewCount: 0,
-    statesVisited: new Set()
+    statesVisited: new Set(),
+    reviewsByState: {},
+    firstReviews: 0
   };
 
-  // Count photo reviews and collect states
+  // Count photo reviews, collect states, and track reviews by state
   if (userReviews && userReviews.length > 0) {
     userReviews.forEach(review => {
       if (review.photoURL) {
         stats.photoReviewCount++;
       }
       if (review.restaurantState) {
-        stats.statesVisited.add(review.restaurantState.toUpperCase());
+        const state = review.restaurantState.toUpperCase();
+        stats.statesVisited.add(state);
+        stats.reviewsByState[state] = (stats.reviewsByState[state] || 0) + 1;
+      }
+    });
+  }
+
+  // Count first-to-review badges (reviews where user was first to review that restaurant)
+  if (restaurantReviews && restaurantReviews.length > 0) {
+    const restaurantReviewCounts = {};
+    restaurantReviews.forEach(review => {
+      const restaurantId = review.restaurantId;
+      if (!restaurantReviewCounts[restaurantId]) {
+        restaurantReviewCounts[restaurantId] = [];
+      }
+      restaurantReviewCounts[restaurantId].push(review);
+    });
+
+    userReviews.forEach(userReview => {
+      const restaurantId = userReview.restaurantId;
+      const reviews = restaurantReviewCounts[restaurantId] || [];
+      // Sort by timestamp to find first
+      const sortedByTime = reviews.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime() || 0;
+        const timeB = b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime() || 0;
+        return timeA - timeB;
+      });
+      if (sortedByTime.length > 0 && sortedByTime[0].userId === userDoc.uid) {
+        stats.firstReviews++;
       }
     });
   }

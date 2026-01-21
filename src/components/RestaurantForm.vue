@@ -6,7 +6,10 @@
       <input v-model="form.description" placeholder="Description" />
       <input v-model="form.address" placeholder="Address" />
       <input v-model="form.city" placeholder="City" />
-      <input v-model="form.state" placeholder="State" />
+      <select v-model="form.state">
+        <option value="" disabled>State</option>
+        <option v-for="state in usStates" :key="state" :value="state">{{ state }}</option>
+      </select>
       <input v-model="form.zip" placeholder="Zip Code" />
       <input v-model="form.url" placeholder="Website URL" />
       <div class="form-actions">
@@ -29,6 +32,13 @@ export default {
   },
   emits: ['close'],
   setup(props, { emit }) {
+    const usStates = [
+      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    ];
     const form = reactive({
       name: '',
       description: '',
@@ -75,7 +85,7 @@ export default {
       emit('close');
     };
 
-    return { form, isEditing, saveRestaurant, cancel };
+    return { form, isEditing, saveRestaurant, cancel, usStates };
   }
 };
 </script>
@@ -94,11 +104,14 @@ export default {
   flex-direction: column;
   gap: 12px;
 }
-.form-container input {
+.form-container input,
+.form-container select {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #e67e22;
   font-size: 1em;
+  background-color: #fff;
+  font-family: inherit;
 }
 .form-actions {
   display: flex;
