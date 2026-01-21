@@ -32,7 +32,10 @@
           </div>
           <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" alt="User" class="user-avatar" referrerpolicy="no-referrer" />
           <div class="user-info">
-            <span class="user-name">{{ user.displayName }}</span>
+            <div class="user-name-line">
+              <span class="user-name">{{ user.displayName }}</span>
+              <BadgeDisplay v-if="user.earnedBadges && user.earnedBadges.length > 0" :badges="user.earnedBadges" :title="''" class="leaderboard-badges" />
+            </div>
             <span class="review-count">{{ user.reviewCount || 0 }} reviews</span>
           </div>
         </li>
@@ -53,7 +56,10 @@
           </div>
           <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" alt="User" class="user-avatar" referrerpolicy="no-referrer" />
           <div class="user-info">
-            <span class="user-name">{{ user.displayName }}</span>
+            <div class="user-name-line">
+              <span class="user-name">{{ user.displayName }}</span>
+              <BadgeDisplay v-if="user.earnedBadges && user.earnedBadges.length > 0" :badges="user.earnedBadges" :title="''" class="leaderboard-badges" />
+            </div>
             <span class="review-count">{{ user.commentCount || 0 }} comments</span>
           </div>
         </li>
@@ -87,7 +93,10 @@
           </div>
           <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" alt="User" class="user-avatar" referrerpolicy="no-referrer" />
           <div class="user-info">
-            <span class="user-name">{{ user.displayName }}</span>
+            <div class="user-name-line">
+              <span class="user-name">{{ user.displayName }}</span>
+              <BadgeDisplay v-if="user.earnedBadges && user.earnedBadges.length > 0" :badges="user.earnedBadges" :title="''" class="leaderboard-badges" />
+            </div>
             <span class="review-count">{{ user.reviewCount }} reviews</span>
           </div>
         </li>
@@ -100,6 +109,8 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { db } from '../firebase';
 import { collection, query, orderBy, limit, getDocs, where, onSnapshot } from 'firebase/firestore';
+import BadgeDisplay from './BadgeDisplay.vue';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
@@ -111,6 +122,7 @@ const US_STATES = [
 
 export default {
   name: 'Leaderboard',
+  components: { BadgeDisplay },
   setup() {
     const loading = ref(true);
     const loadingCommenters = ref(true);
@@ -122,6 +134,32 @@ export default {
     const selectedState = ref('');
     const statesList = ref(US_STATES);
     let unsubscribe = () => {};
+
+    const loadUserBadges = async (userId) => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', userId)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', userId)));
+        let userDoc = null;
+        if (!userDocSnap.empty) {
+          userDoc = userDocSnap.docs[0].data();
+        }
+        
+        if (userDoc) {
+          const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          return badgeIds;
+        }
+        return [];
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+        return [];
+      }
+    };
 
     onMounted(() => {
       loadTopReviewers();
@@ -137,7 +175,7 @@ export default {
           limit(30)
         );
         
-        unsubscribe = onSnapshot(usersQuery, (querySnapshot) => {
+        unsubscribe = onSnapshot(usersQuery, async (querySnapshot) => {
           const fetchedUsers = querySnapshot.docs.map(doc => doc.data());
           
           const usersWithReviews = fetchedUsers.filter(user => {
@@ -151,7 +189,15 @@ export default {
             return countB - countA;
           });
           
-          users.value = sortedUsers.slice(0, 10);
+          // Load badges for each user
+          const usersWithBadges = await Promise.all(
+            sortedUsers.slice(0, 10).map(async (user) => {
+              const badges = await loadUserBadges(user.uid);
+              return { ...user, earnedBadges: badges };
+            })
+          );
+          
+          users.value = usersWithBadges;
           loading.value = false;
         }, (error) => {
           console.error("Error fetching leaderboard:", error);
@@ -194,15 +240,21 @@ export default {
         });
 
         // Create leaderboard from comment counts
-        const topCommenters = Object.entries(commentCountMap)
-          .map(([userId, count]) => ({
-            ...userMap[userId],
-            uid: userId,
-            commentCount: count
-          }))
-          .filter(user => user.displayName) // Only include users with valid data
-          .sort((a, b) => b.commentCount - a.commentCount)
-          .slice(0, 10);
+        const topCommenters = await Promise.all(
+          Object.entries(commentCountMap)
+            .map(([userId, count]) => ({
+              ...userMap[userId],
+              uid: userId,
+              commentCount: count
+            }))
+            .filter(user => user.displayName) // Only include users with valid data
+            .sort((a, b) => b.commentCount - a.commentCount)
+            .slice(0, 10)
+            .map(async (user) => {
+              const badges = await loadUserBadges(user.uid);
+              return { ...user, earnedBadges: badges };
+            })
+        );
 
         commenters.value = topCommenters;
         loadingCommenters.value = false;
@@ -260,7 +312,7 @@ export default {
         console.log('Review By User State Map:', reviewsByUserState);
 
         // Build regional leaderboard based on selected state
-        const updateRegionalLeaderboard = () => {
+        const updateRegionalLeaderboard = async () => {
           let data = Object.values(reviewsByUserState);
           
           if (selectedState.value) {
@@ -268,15 +320,21 @@ export default {
             console.log(`Filtered for ${selectedState.value}:`, data);
           }
 
-          const leaderboard = data
-            .map(item => ({
-              ...userMap[item.userId],
-              uid: item.userId,
-              reviewCount: item.count
-            }))
-            .filter(user => user.displayName)
-            .sort((a, b) => b.reviewCount - a.reviewCount)
-            .slice(0, 10);
+          const leaderboard = await Promise.all(
+            data
+              .map(item => ({
+                ...userMap[item.userId],
+                uid: item.userId,
+                reviewCount: item.count
+              }))
+              .filter(user => user.displayName)
+              .sort((a, b) => b.reviewCount - a.reviewCount)
+              .slice(0, 10)
+              .map(async (user) => {
+                const badges = await loadUserBadges(user.uid);
+                return { ...user, earnedBadges: badges };
+              })
+          );
 
           regionalLeaderboard.value = leaderboard;
         };
@@ -437,9 +495,23 @@ export default {
   flex-direction: column;
   flex-grow: 1;
 }
+.user-name-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
 .user-name {
   font-weight: 600;
   font-size: 1.1em;
+}
+.leaderboard-badges {
+  display: flex;
+  gap: 2px;
+}
+.leaderboard-badges :deep(.badge) {
+  font-size: 0.8em;
+  width: 18px;
+  height: 18px;
 }
 .review-count {
   color: #777;

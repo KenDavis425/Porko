@@ -442,3 +442,48 @@ A: We calculate trending restaurants based on activity this week. "Most Reviewed
 If you have questions not covered in this guide or encounter issues, please reach out to the PorkHub support team.
 
 Happy reviewing and pork tenderloin hunting! 🐷🥓
+
+---
+
+## Change Log
+
+Track what's new and improved in PorkHub with each release.
+
+### Version 26.1.20 — Gamification & Social Features
+
+**Released January 20, 2026**
+
+#### New Features
+- **User Profile Page** – Click your profile picture in the sidebar to view your personal stats dashboard
+- **Achievement Badges** – Earn 6 different badges as you reach milestones:
+  - 📝 10 Reviews, 📚 25 Reviews, 🔥 50 Reviews, 🏆 100 Reviews
+  - 📸 Photo Master (10+ photo reviews)
+  - 🗺️ All 50 States (reviewed in all 50 US states)
+- **Trending Restaurants** – Discover what's hot in the community with two trending views:
+  - 🔥 Most Reviewed This Week
+  - ⭐ Highest Rated This Week
+- **Follow Recommendations** – Get smart suggestions on which quality reviewers to follow based on mutual connections
+- **Activity Feed** – See the latest reviews and achievements from users you follow in real-time
+
+#### Improvements
+- Enhanced user stats tracking (Total Reviews, Photo Reviews, States Visited, Followers)
+- Achievement progress bars showing how close you are to the next badge
+- Better badge visibility throughout the app
+- Gamification features on Home page organized in an attractive 3-column layout
+
+### Version 26.1.21 — Leaderboard Medals & Badges Display
+
+**Released January 21, 2026**
+
+#### New Features
+- **Leaderboard Medals** – Top 10 reviewers now display achievement medals next to their names:
+  - 🥇 Gold medal for #1 reviewer
+  - 🥈 Silver medal for #2 reviewer
+  - 🥉 Bronze medal for #3 reviewer
+  - 🏅 Participation medal for positions 4-10
+
+#### Improvements
+- **Comments** – Commenters now show their leaderboard medals and earned badges
+- **My Reviews** – Your posts now display your leaderboard medal and all earned accomplishment badges
+- **User Search / Follow Users** – Users in search results display their medals and badges for easy identification of quality reviewers
+- Consistent badge icon display across all components for better visual recognition

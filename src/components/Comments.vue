@@ -5,7 +5,13 @@
         <img :src="comment.userPhoto || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" :alt="comment.userName" class="comment-user-photo" referrerpolicy="no-referrer" />
         <div class="comment-content">
           <div class="comment-header">
-            <span class="comment-user-name">{{ comment.userName }}</span>
+            <div class="comment-user-section">
+              <span class="comment-user-name">{{ comment.userName }}</span>
+              <div v-if="comment.medals && comment.medals.length > 0" class="comment-medals">
+                <span v-for="(medalData, idx) in comment.medals" :key="idx" class="comment-medal" :title="medalData.title">{{ medalData.medal }}</span>
+              </div>
+              <BadgeDisplay v-if="comment.userBadges && comment.userBadges.length > 0" :badges="comment.userBadges" :title="''" class="comment-badges" />
+            </div>
             <span class="comment-date">{{ formatDate(comment.createdAt) }}</span>
           </div>
           <div v-if="editingCommentId !== comment.id">
@@ -38,11 +44,14 @@
 <script>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, documentId } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, documentId, limit, increment } from 'firebase/firestore';
 import { showToast } from '../utils/toast.js';
+import BadgeDisplay from './BadgeDisplay.vue';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 export default {
   name: 'Comments',
+  components: { BadgeDisplay },
   props: {
     postId: { type: String, required: true },
     postType: { type: String, required: true },
@@ -59,7 +68,90 @@ export default {
     const editingText = ref('');
     let unsubscribe = () => {};
 
+    const getMedal = (index) => {
+      if (typeof index !== 'number') return null;
+      if (index === 0) return '🥇';
+      if (index === 1) return '🥈';
+      if (index === 2) return '🥉';
+      if (index >= 3 && index < 10) return '🏅';
+      return null;
+    };
+
+    const getMedalWithTitle = (index, type) => {
+      const medal = getMedal(index);
+      if (!medal) return null;
+      const titles = {
+        reviewers: 'Top Reviewer',
+        commenters: 'Top Commenter',
+        state: 'State Leader'
+      };
+      return { medal, title: `${index + 1}. ${titles[type]}` };
+    };
+
+    const leaderboardRanks = ref(new Map());
+    const commenterRanks = ref(new Map());
+
+    const loadUserBadges = async (userId) => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', userId)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', userId)));
+        let userDoc = null;
+        if (!userDocSnap.empty) {
+          userDoc = userDocSnap.docs[0].data();
+        }
+        
+        if (userDoc) {
+          const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          return badgeIds;
+        }
+        return [];
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+        return [];
+      }
+    };
+
     onMounted(() => {
+      // Load leaderboard ranks once
+      (async () => {
+        try {
+          const leaderboardSnap = await getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30)));
+          const usersWithReviews = leaderboardSnap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(user => (Number(user.reviewCount) || 0) > 0)
+            .sort((a, b) => (Number(b.reviewCount) || 0) - (Number(a.reviewCount) || 0))
+            .slice(0, 10);
+          
+          const ranks = new Map();
+          usersWithReviews.forEach((user, index) => {
+            ranks.set(user.id, index);
+          });
+          leaderboardRanks.value = ranks;
+
+          // Load commenter ranks
+          const commentersSnap = await getDocs(query(collection(db, 'users'), orderBy('commentCount', 'desc'), limit(30)));
+          const usersWithComments = commentersSnap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(user => (Number(user.commentCount) || 0) > 0)
+            .sort((a, b) => (Number(b.commentCount) || 0) - (Number(a.commentCount) || 0))
+            .slice(0, 10);
+          
+          const commenterRanksMap = new Map();
+          usersWithComments.forEach((user, index) => {
+            commenterRanksMap.set(user.id, index);
+          });
+          commenterRanks.value = commenterRanksMap;
+        } catch (error) {
+          console.error('Error loading leaderboard:', error);
+        }
+      })();
+
       // Use a DocumentReference for the parent, then get the subcollection correctly.
       const parentDocRef = doc(db, props.postType, props.postId);
       const commentsCollection = collection(parentDocRef, 'comments');
@@ -71,6 +163,8 @@ export default {
         
         if (userIds.length > 0) {
           const usersMap = new Map();
+          const userBadgesMap = new Map();
+          
           // Firestore 'in' query is limited to 30 elements
           for (let i = 0; i < userIds.length; i += 30) {
             const batchIds = userIds.slice(i, i + 30);
@@ -79,12 +173,34 @@ export default {
             usersSnapshot.forEach(doc => usersMap.set(doc.id, doc.data()));
           }
           
+          // Load badges for all users
+          for (const userId of userIds) {
+            const badges = await loadUserBadges(userId);
+            userBadgesMap.set(userId, badges);
+          }
+          
           comments.value = commentData.map(comment => {
             const user = usersMap.get(comment.userId);
+            const reviewerRank = leaderboardRanks.value.get(comment.userId);
+            const commenterRank = commenterRanks.value.get(comment.userId);
+            
+            // Build array of all applicable medals
+            const medals = [];
+            if (reviewerRank !== undefined) {
+              const medalData = getMedalWithTitle(reviewerRank, 'reviewers');
+              if (medalData) medals.push(medalData);
+            }
+            if (commenterRank !== undefined) {
+              const medalData = getMedalWithTitle(commenterRank, 'commenters');
+              if (medalData) medals.push(medalData);
+            }
+            
             return {
               ...comment,
               userName: user?.displayName || comment.userName || 'Unknown User',
-              userPhoto: user?.photoURL || comment.userPhoto || null
+              userPhoto: user?.photoURL || comment.userPhoto || null,
+              userBadges: userBadgesMap.get(comment.userId) || [],
+              medals: medals
             };
           });
         } else {
@@ -106,6 +222,7 @@ export default {
       const parentDocRef = doc(db, props.postType, props.postId);
       const commentsCollection = collection(parentDocRef, 'comments');
       const reviewDocRef = doc(db, 'reviews', props.postId);
+      const userRef = doc(db, 'users', currentUser.uid);
 
       await Promise.all([
         addDoc(commentsCollection, {
@@ -113,7 +230,8 @@ export default {
           text: newComment.value,
           createdAt: now,
         }),
-        updateDoc(reviewDocRef, { lastActivityAt: now })
+        updateDoc(reviewDocRef, { lastActivityAt: now }),
+        updateDoc(userRef, { commentCount: increment(1) })
       ]);
       newComment.value = '';
     };
@@ -154,13 +272,16 @@ export default {
     const deleteComment = async (commentId) => {
       if (confirm('Are you sure you want to delete this comment?')) {
         try {
+          const comment = comments.value.find(c => c.id === commentId);
           const parentDocRef = doc(db, props.postType, props.postId);
           const commentsCollection = collection(parentDocRef, 'comments');
           const commentDoc = doc(commentsCollection, commentId);
           const reviewDocRef = doc(db, 'reviews', props.postId);
+          const userRef = doc(db, 'users', comment.userId);
           await Promise.all([
             deleteDoc(commentDoc),
-            updateDoc(reviewDocRef, { lastActivityAt: serverTimestamp() })
+            updateDoc(reviewDocRef, { lastActivityAt: serverTimestamp() }),
+            updateDoc(userRef, { commentCount: increment(-1) })
           ]);
           showToast('Comment deleted successfully', 'success');
         } catch (error) {
@@ -193,10 +314,15 @@ export default {
 .comment { display: flex; gap: 0.75em; margin-bottom: 1em; }
 .comment-user-photo { width: 32px; height: 32px; border-radius: 50%; }
 .comment-content { flex-grow: 1; }
-.comment-header { display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.25em; }
+.comment-header { display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.25em; justify-content: space-between; }
+.comment-user-section { display: flex; align-items: center; gap: 0.5em; }
 .comment-info { display: flex; align-items: baseline; gap: 0.5em; }
 .comment-user-name { font-weight: 600; font-size: 0.9em; }
 .comment-date { font-size: 0.75em; color: #777; }
+.comment-badges { display: flex; gap: 2px; }
+.comment-badges :deep(.badge) { font-size: 0.7em; width: 16px; height: 16px; }
+.comment-medals { display: flex; gap: 0.25em; }
+.comment-medal { font-size: 0.9em; cursor: help; }
 .comment-text { margin: 0 0 0.5em; font-size: 0.95em; line-height: 1.4; }
 .comment-actions { font-size: 0.8em; }
 .action-btn { background: none; border: none; color: #777; cursor: pointer; padding: 0 5px 0 0; }

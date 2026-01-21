@@ -471,6 +471,32 @@
           <p>Track what's new and improved in PorkHub with each release.</p>
 
           <div class="changelog-item">
+            <h3>Version 26.1.21 — Leaderboard Medals & Badges Display</h3>
+            <p class="release-date">Released January 21, 2026</p>
+            <h4>New Features</h4>
+            <ul>
+              <li><strong>Multiple Leaderboard Medals</strong> — Users can earn medals from multiple leaderboards and display them all:
+                <ul>
+                  <li>Top Reviewers leaderboard (based on review count)</li>
+                  <li>Top Commenters leaderboard (based on comment count)</li>
+                  <li>🥇 Gold, 🥈 Silver, 🥉 Bronze medals for top 3, 🏅 Participation medals for positions 4-10</li>
+                </ul>
+              </li>
+              <li><strong>Medal Hover Tooltips</strong> — Hover over medals to see which leaderboard they represent and the user's rank</li>
+              <li><strong>Comment Count Tracking</strong> — System now tracks and ranks users based on their comment contributions</li>
+            </ul>
+            <h4>Improvements</h4>
+            <ul>
+              <li><strong>Home Feed</strong> — Posts now display all applicable leaderboard medals with rank information</li>
+              <li><strong>Comments</strong> — Commenters now show all their leaderboard medals and earned badges with hover titles</li>
+              <li><strong>My Reviews</strong> — Your posts now display all applicable leaderboard medals and accomplishment badges</li>
+              <li><strong>User Search / Follow Users</strong> — Users in search results display all their medals and badges for easy identification</li>
+              <li>Consistent badge icon display across all components for better visual recognition</li>
+              <li>Comment count increments/decrements properly when adding or deleting comments</li>
+            </ul>
+          </div>
+
+          <div class="changelog-item">
             <h3>Version 26.1.20 — Gamification & Social Features</h3>
             <p class="release-date">Released January 20, 2026</p>
             <h4>New Features</h4>

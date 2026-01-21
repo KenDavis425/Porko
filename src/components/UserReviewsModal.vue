@@ -2,7 +2,10 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Reviews by {{ user.displayName }}</h2>
+        <div class="modal-title-line">
+          <h2>Reviews by {{ user.displayName }}</h2>
+          <BadgeDisplay v-if="user.earnedBadges && user.earnedBadges.length > 0" :badges="user.earnedBadges" :title="''" class="modal-badges" />
+        </div>
         <button @click="$emit('close')" class="close-btn">&times;</button>
       </div>
       <div class="modal-body">
@@ -36,10 +39,12 @@ import { ref, watch } from 'vue';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
+import BadgeDisplay from './BadgeDisplay.vue';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 export default {
   name: 'UserReviewsModal',
-  components: { StarRating },
+  components: { StarRating, BadgeDisplay },
   props: {
     user: {
       type: Object,
@@ -50,6 +55,32 @@ export default {
   setup(props) {
     const reviews = ref([]);
     const loading = ref(true);
+
+    const loadUserBadges = async (userId) => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', userId)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', userId)));
+        let userDoc = null;
+        if (!userDocSnap.empty) {
+          userDoc = userDocSnap.docs[0].data();
+        }
+        
+        if (userDoc) {
+          const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          return badgeIds;
+        }
+        return [];
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+        return [];
+      }
+    };
 
     const fetchReviews = async () => {
       if (!props.user?.uid) {
@@ -80,6 +111,10 @@ export default {
             restaurantName: restaurantsMap.get(data.restaurantId) || 'Unknown Restaurant'
           };
         });
+        
+        // Load badges for the user
+        const badges = await loadUserBadges(props.user.uid);
+        props.user.earnedBadges = badges;
       } catch (error) {
         console.error("Error fetching user reviews:", error);
       } finally {
@@ -106,7 +141,17 @@ export default {
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 .modal-content { background: white; padding: 2em; border-radius: 12px; width: 90%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 1em; margin-bottom: 1em; }
+.modal-title-line { display: flex; align-items: center; gap: 0.5em; }
 .modal-header h2 { margin: 0; font-size: 1.5em; }
+.modal-badges {
+  display: flex;
+  gap: 2px;
+}
+.modal-badges :deep(.badge) {
+  font-size: 0.85em;
+  width: 20px;
+  height: 20px;
+}
 .close-btn { background: none; border: none; font-size: 2em; cursor: pointer; line-height: 1; }
 .modal-body { overflow-y: auto; }
 .loading-indicator, .no-reviews-message { text-align: center; padding: 2em; color: #777; }

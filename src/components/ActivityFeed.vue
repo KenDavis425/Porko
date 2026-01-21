@@ -19,6 +19,7 @@
           <div class="activity-info">
             <div class="activity-action">
               <span class="user-name">{{ activity.userName }}</span>
+              <BadgeDisplay v-if="activity.userBadges && activity.userBadges.length > 0" :badges="activity.userBadges" :title="''" class="activity-badges" />
               <span v-if="activity.badgesEarned && activity.badgesEarned.length > 0" class="badge-indicator">
                 🎉 earned badges!
               </span>
@@ -61,10 +62,12 @@
 import { ref, onMounted } from 'vue';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { getBadgeById } from '../utils/badges';
+import { getBadgeById, calculateEarnedBadges, formatUserStats } from '../utils/badges';
+import BadgeDisplay from './BadgeDisplay.vue';
 
 export default {
   name: 'ActivityFeed',
+  components: { BadgeDisplay },
   props: {
     user: {
       type: Object,
@@ -79,6 +82,32 @@ export default {
   setup(props, { emit }) {
     const activities = ref([]);
     const loading = ref(true);
+
+    const loadUserBadges = async (userId) => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', userId)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', userId)));
+        let userDoc = null;
+        if (!userDocSnap.empty) {
+          userDoc = userDocSnap.docs[0].data();
+        }
+        
+        if (userDoc) {
+          const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          return badgeIds;
+        }
+        return [];
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+        return [];
+      }
+    };
 
     const loadActivityFeed = async () => {
       loading.value = true;
@@ -130,17 +159,19 @@ export default {
 
         // Build activity items
         const activityList = [];
-        reviewsSnap.docs.forEach(doc => {
+        for (const doc of reviewsSnap.docs) {
           const review = doc.data();
           const user = usersMap.get(review.userId);
           const restaurant = restaurantsMap.get(review.restaurantId);
 
           if (user && restaurant) {
+            const badges = await loadUserBadges(review.userId);
             activityList.push({
               id: doc.id,
               userId: review.userId,
               userName: user.displayName || 'Unknown User',
               userPhoto: user.photoURL,
+              userBadges: badges,
               timestamp: review.createdAt,
               reviewRestaurant: restaurant.name,
               restaurantId: review.restaurantId,
@@ -149,7 +180,7 @@ export default {
               badgesEarned: [] // Could be populated from user data
             });
           }
-        });
+        }
 
         activities.value = activityList.slice(0, 15); // Limit to 15 most recent
       } catch (error) {
@@ -299,6 +330,17 @@ export default {
 .user-name {
   font-weight: 600;
   color: var(--secondary-color);
+}
+
+.activity-badges {
+  display: flex;
+  gap: 2px;
+}
+
+.activity-badges :deep(.badge) {
+  font-size: 0.65em;
+  width: 14px;
+  height: 14px;
 }
 
 .badge-indicator {

@@ -12,7 +12,10 @@
           <div class="post-info">
             <div class="user-line">
               <span class="user-name">{{ review.userName }}</span>
-              <span v-if="review.medal" class="medal">{{ review.medal }}</span>
+              <div v-if="review.medals && review.medals.length > 0" class="medals">
+                <span v-for="(medalData, idx) in review.medals" :key="idx" class="medal" :title="medalData.title">{{ medalData.medal }}</span>
+              </div>
+              <BadgeDisplay v-if="review.userBadges && review.userBadges.length > 0" :badges="review.userBadges" class="post-badges" />
             </div>
             <span class="post-date">{{ formatDate(review.createdAt) }}</span>
           </div>
@@ -97,8 +100,10 @@ import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, getDocs, limit, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 import Comments from './Comments.vue';
+import BadgeDisplay from './BadgeDisplay.vue';
 import { getDistance } from '../utils/geolocation.js';
 import { showToast } from '../utils/toast.js';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 const props = defineProps({
   user: {
@@ -118,6 +123,8 @@ const editingRating = ref(0);
 const originalEditData = ref(null);
 const userLocation = ref(null);
 const leaderboardRanks = ref(new Map());
+const commenterRanks = ref(new Map());
+const userBadges = ref([]);
 
 const getMedal = (index) => {
   // Medals are assigned based on position (0-indexed)
@@ -131,6 +138,17 @@ const getMedal = (index) => {
   if (index === 2) return '🥉';
   if (index >= 3 && index < 10) return '🏅';
   return null;
+};
+
+const getMedalWithTitle = (index, type) => {
+  const medal = getMedal(index);
+  if (!medal) return null;
+  const titles = {
+    reviewers: 'Top Reviewer',
+    commenters: 'Top Commenter',
+    state: 'State Leader'
+  };
+  return { medal, title: `${index + 1}. ${titles[type]}` };
 };
 
 let reviewsUnsubscribe = () => {};
@@ -260,7 +278,29 @@ onMounted(() => {
     });
   }
 
-  // Fetch leaderboard ranks
+  // Load user badges
+  if (props.user?.uid) {
+    (async () => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', props.user.uid)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDoc(doc(db, 'users', props.user.uid));
+        if (userDocSnap.exists()) {
+          const userStats = formatUserStats(userDocSnap.data(), userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          userBadges.value = badgeIds;
+        }
+      } catch (err) {
+        console.error('Error loading badges:', err);
+      }
+    })();
+  }
+
+  // Fetch leaderboard ranks (Top Reviewers)
   getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30))).then(leaderboardSnap => {
     const usersWithReviews = leaderboardSnap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
@@ -280,6 +320,28 @@ onMounted(() => {
       ranks.set(user.id, index);
     });
     leaderboardRanks.value = ranks;
+  });
+
+  // Fetch commenter ranks (Top Commenters)
+  getDocs(query(collection(db, 'users'), orderBy('commentCount', 'desc'), limit(30))).then(commentersSnap => {
+    const usersWithComments = commentersSnap.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(user => {
+        const count = Number(user.commentCount) || 0;
+        return count > 0;
+      })
+      .sort((a, b) => {
+        const countA = Number(a.commentCount) || 0;
+        const countB = Number(b.commentCount) || 0;
+        return countB - countA;
+      })
+      .slice(0, 10);
+    
+    const ranks = new Map();
+    usersWithComments.forEach((user, index) => {
+      ranks.set(user.id, index);
+    });
+    commenterRanks.value = ranks;
   });
 
   // Real-time listener for all restaurants to get their names
@@ -306,7 +368,20 @@ const populatedReviews = computed(() => {
   const currentUser = props.user;
   return reviews.value.map(review => {
     const restaurant = restaurantsMap.value.get(review.restaurantId);
-    const rank = leaderboardRanks.value.get(currentUser?.uid);
+    const reviewerRank = leaderboardRanks.value.get(currentUser?.uid);
+    const commenterRank = commenterRanks.value.get(currentUser?.uid);
+    
+    // Build array of all applicable medals
+    const medals = [];
+    if (reviewerRank !== undefined) {
+      const medalData = getMedalWithTitle(reviewerRank, 'reviewers');
+      if (medalData) medals.push(medalData);
+    }
+    if (commenterRank !== undefined) {
+      const medalData = getMedalWithTitle(commenterRank, 'commenters');
+      if (medalData) medals.push(medalData);
+    }
+    
     return {
       ...review,
       restaurantName: restaurant?.name || "Unknown Restaurant",
@@ -315,7 +390,8 @@ const populatedReviews = computed(() => {
       userName: currentUser?.displayName || 'You',
       userPhoto: currentUser?.photoURL || null,
       distance: userLocation.value && restaurant?.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null,
-      medal: getMedal(rank)
+      medals: medals,
+      userBadges: userBadges.value
     };
   });
 });
@@ -447,8 +523,26 @@ const deleteReview = async (reviewId) => {
   font-weight: 600;
 }
 
+.medals {
+  display: flex;
+  gap: 0.25em;
+  align-items: center;
+}
+
 .medal {
   font-size: 1.1em;
+  cursor: help;
+}
+
+.badges {
+  display: flex;
+  gap: 0.25em;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 1em;
+  display: inline-block;
 }
 
 .post-date {

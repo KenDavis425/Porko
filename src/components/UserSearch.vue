@@ -24,7 +24,10 @@
             <div class="user-details">
               <div class="user-name-line">
                 <span class="user-name">{{ user.displayName }}</span>
-                <span v-if="user.medal" class="medal">{{ user.medal }}</span>
+                <div v-if="user.medals && user.medals.length > 0" class="medals">
+                  <span v-for="(medalData, idx) in user.medals" :key="idx" class="medal" :title="medalData.title">{{ medalData.medal }}</span>
+                </div>
+                <BadgeDisplay v-if="user.userBadges && user.userBadges.length > 0" :badges="user.userBadges" class="user-badges" />
               </div>
               <div v-if="user.distance !== null" class="user-distance">{{ user.distance.toFixed(1) }} miles away</div>
             </div>
@@ -56,14 +59,16 @@
 <script>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, doc, deleteDoc, addDoc, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, deleteDoc, addDoc, orderBy, limit, onSnapshot, documentId } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 import { getDistance } from '../utils/geolocation.js';
 import UserReviewsModal from './UserReviewsModal.vue';
+import BadgeDisplay from './BadgeDisplay.vue';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 export default {
   name: 'UserSearch',
-  components: { StarRating, UserReviewsModal },
+  components: { StarRating, UserReviewsModal, BadgeDisplay },
   setup() {
     const users = ref([]);
     const loading = ref(true);
@@ -73,6 +78,7 @@ export default {
     const isReviewsModalVisible = ref(false);
     const userForReviews = ref(null);
     const leaderboardRanks = ref(new Map());
+    const commenterRanks = ref(new Map());
     let followsUnsubscribe = () => {};
     
     const getMedal = (index) => {
@@ -87,6 +93,17 @@ export default {
       if (index === 2) return '🥉';
       if (index >= 3 && index < 10) return '🏅';
       return null;
+    };
+
+    const getMedalWithTitle = (index, type) => {
+      const medal = getMedal(index);
+      if (!medal) return null;
+      const titles = {
+        reviewers: 'Top Reviewer',
+        commenters: 'Top Commenter',
+        state: 'State Leader'
+      };
+      return { medal, title: `${index + 1}. ${titles[type]}` };
     };
 
     const fetchUsers = async () => {
@@ -126,6 +143,27 @@ export default {
         ranks.set(user.id, index);
       });
       leaderboardRanks.value = ranks;
+
+      // Fetch commenter ranks
+      const commentersSnap = await getDocs(query(collection(db, 'users'), orderBy('commentCount', 'desc'), limit(30)));
+      const usersWithComments = commentersSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(user => {
+          const count = Number(user.commentCount) || 0;
+          return count > 0;
+        })
+        .sort((a, b) => {
+          const countA = Number(a.commentCount) || 0;
+          const countB = Number(b.commentCount) || 0;
+          return countB - countA;
+        })
+        .slice(0, 10);
+      
+      const commenterRanksMap = new Map();
+      usersWithComments.forEach((user, index) => {
+        commenterRanksMap.set(user.id, index);
+      });
+      commenterRanks.value = commenterRanksMap;
 
       const restaurantsSnap = await getDocs(collection(db, 'restaurants'));
       const restaurantsMap = new Map();
@@ -171,13 +209,43 @@ export default {
             }
           }
 
-          const rank = leaderboardRanks.value.get(user.uid);
+          // Load user badges
+          let userBadges = [];
+          try {
+            const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', user.uid)));
+            const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+            
+            const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+            const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+            
+            const userStats = formatUserStats(user, userReviews, restaurantReviews);
+            const badgeIds = calculateEarnedBadges(userStats);
+            userBadges = badgeIds;
+          } catch (err) {
+            console.error('Error loading badges:', err);
+          }
+
+          const reviewerRank = leaderboardRanks.value.get(user.uid);
+          const commenterRank = commenterRanks.value.get(user.uid);
+          
+          // Build array of all applicable medals
+          const medals = [];
+          if (reviewerRank !== undefined) {
+            const medalData = getMedalWithTitle(reviewerRank, 'reviewers');
+            if (medalData) medals.push(medalData);
+          }
+          if (commenterRank !== undefined) {
+            const medalData = getMedalWithTitle(commenterRank, 'commenters');
+            if (medalData) medals.push(medalData);
+          }
+          
           return {
             ...user,
             isFollowing: following.value.includes(user.uid),
             lastReview,
             distance,
-            medal: getMedal(rank)
+            medals: medals,
+            userBadges
           };
         })
       );
@@ -346,8 +414,27 @@ export default {
   font-size: 1.1em;
   word-break: break-word;
 }
+
+.medals {
+  display: flex;
+  gap: 0.25em;
+  align-items: center;
+}
+
 .medal {
   font-size: 1.1em;
+  cursor: help;
+}
+
+.badges {
+  display: flex;
+  gap: 0.25em;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 1em;
+  display: inline-block;
 }
 .user-distance {
   font-size: 0.9em;

@@ -12,8 +12,9 @@
           <div class="user-info">
             <img :src="user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'" class="user-avatar" alt="User" referrerpolicy="no-referrer" />
             <div class="user-details">
-              <div class="user-name-line">
+            <div class="user-name-line">
                 <span class="user-name">{{ user.displayName }}</span>
+                <BadgeDisplay v-if="user.earnedBadges && user.earnedBadges.length > 0" :badges="user.earnedBadges" :title="''" class="user-card-badges" />
                 <span v-if="user.medal" class="medal">{{ user.medal }}</span>
               </div>
             </div>
@@ -48,7 +49,9 @@ import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, doc, deleteDoc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import StarRating from './StarRating.vue';
 import UserReviewsModal from './UserReviewsModal.vue';
+import BadgeDisplay from './BadgeDisplay.vue';
 import { showToast } from '../utils/toast.js';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 const getMedal = (index) => {
   // Medals are assigned based on position (0-indexed)
@@ -66,7 +69,7 @@ const getMedal = (index) => {
 
 export default {
   name: 'Following',
-  components: { StarRating, UserReviewsModal },
+  components: { StarRating, UserReviewsModal, BadgeDisplay },
   setup() {
     const following = ref([]);
     const loading = ref(true);
@@ -74,6 +77,32 @@ export default {
     const userForReviews = ref(null);
     const leaderboardRanks = ref(new Map());
     let unsubscribe = () => {};
+
+    const loadUserBadges = async (userId) => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', userId)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', userId)));
+        let userDoc = null;
+        if (!userDocSnap.empty) {
+          userDoc = userDocSnap.docs[0].data();
+        }
+        
+        if (userDoc) {
+          const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          return badgeIds;
+        }
+        return [];
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+        return [];
+      }
+    };
 
     const fetchFollowing = async () => {
       loading.value = true;
@@ -151,7 +180,8 @@ export default {
             };
           }
           const rank = leaderboardRanks.value.get(user.uid);
-          return { ...user, lastReview, medal: getMedal(rank) };
+          const badges = await loadUserBadges(user.uid);
+          return { ...user, lastReview, medal: getMedal(rank), earnedBadges: badges };
         })
       );
 
@@ -210,6 +240,15 @@ export default {
   gap: 0.5em;
 }
 .user-name { font-weight: 600; font-size: 1.1em; word-break: break-word; }
+.user-card-badges {
+  display: flex;
+  gap: 2px;
+}
+.user-card-badges :deep(.badge) {
+  font-size: 0.75em;
+  width: 16px;
+  height: 16px;
+}
 .medal {
   font-size: 1.1em;
 }

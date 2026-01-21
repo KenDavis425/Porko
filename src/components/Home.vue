@@ -38,7 +38,10 @@
             <div class="post-info">
               <div class="user-line">
                 <span class="user-name">{{ post.userName }}</span>
-                <span v-if="post.medal" class="medal">{{ post.medal }}</span>
+                <div v-if="post.medals && post.medals.length > 0" class="medals">
+                  <span v-for="(medalData, idx) in post.medals" :key="idx" class="medal" :title="medalData.title">{{ medalData.medal }}</span>
+                </div>
+                <BadgeDisplay v-if="post.userBadges && post.userBadges.length > 0" :badges="post.userBadges" :title="''" class="post-badges" />
               </div>
               <span class="post-date">{{ post.createdAt.toDate().toLocaleString() }}</span>
             </div>
@@ -121,17 +124,20 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import Comments from './Comments.vue';
 import StarRating from './StarRating.vue';
+import BadgeDisplay from './BadgeDisplay.vue';
 import ActivityFeed from './ActivityFeed.vue';
 import TrendingRestaurants from './TrendingRestaurants.vue';
 import FollowRecommendations from './FollowRecommendations.vue';
 import { getDistance } from '../utils/geolocation.js';
 import { showToast } from '../utils/toast.js';
+import { calculateEarnedBadges, formatUserStats } from '../utils/badges.js';
 
 export default {
   name: 'Home',
   components: {
     StarRating,
     Comments,
+    BadgeDisplay,
     ActivityFeed,
     TrendingRestaurants,
     FollowRecommendations
@@ -156,16 +162,55 @@ export default {
     const unsubscribes = [];
     const bucketList = ref(new Set());
     const leaderboardRanks = ref(new Map());
+    const commenterRanks = ref(new Map());
     const restaurantsMap = ref(new Map());
     const sortOrder = ref('time'); // 'time' or 'distance'
     const userFollowing = ref([]); // For gamification features
     let isSettingUpListeners = false; // Guard to prevent concurrent setup
 
+    const loadUserBadges = async (userId) => {
+      try {
+        const userReviewsSnap = await getDocs(query(collection(db, 'reviews'), where('userId', '==', userId)));
+        const userReviews = userReviewsSnap.docs.map(doc => doc.data());
+        
+        const allReviewsSnap = await getDocs(collection(db, 'reviews'));
+        const restaurantReviews = allReviewsSnap.docs.map(doc => doc.data());
+        
+        const userDocSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', userId)));
+        let userDoc = null;
+        if (!userDocSnap.empty) {
+          userDoc = userDocSnap.docs[0].data();
+        }
+        
+        if (userDoc) {
+          const userStats = formatUserStats(userDoc, userReviews, restaurantReviews);
+          const badgeIds = calculateEarnedBadges(userStats);
+          return badgeIds;
+        }
+        return [];
+      } catch (error) {
+        console.error('Error loading user badges:', error);
+        return [];
+      }
+    };
+
     const processAndSetPosts = () => {
       // Always re-calculate medals before sorting and displaying
       allPosts.forEach(post => {
-        const rank = leaderboardRanks.value.get(post.userId);
-        post.medal = getMedal(rank);
+        const reviewerRank = leaderboardRanks.value.get(post.userId);
+        const commenterRank = commenterRanks.value.get(post.userId);
+        
+        // Build array of all applicable medals
+        const medals = [];
+        if (reviewerRank !== undefined) {
+          const medalData = getMedalWithTitle(reviewerRank, 'reviewers');
+          if (medalData) medals.push(medalData);
+        }
+        if (commenterRank !== undefined) {
+          const medalData = getMedalWithTitle(commenterRank, 'commenters');
+          if (medalData) medals.push(medalData);
+        }
+        post.medals = medals;
       });
 
       const sortedPosts = Array.from(allPosts.values()).sort((a, b) => {
@@ -285,11 +330,12 @@ export default {
 
         // Fetch initial data including the leaderboard to avoid race conditions
         const followsPromise = currentUser ? getDocs(query(collection(db, 'follows'), where('followerId', '==', currentUser.uid))) : Promise.resolve({ docs: [] });
-        const [followsSnap, restaurantsSnap, usersSnap, leaderboardSnap] = await Promise.all([
+        const [followsSnap, restaurantsSnap, usersSnap, leaderboardSnap, commentersSnap] = await Promise.all([
           followsPromise,
           getDocs(collection(db, 'restaurants')),
           getDocs(collection(db, 'users')),
-          getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30)))
+          getDocs(query(collection(db, 'users'), orderBy('reviewCount', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'users'), orderBy('commentCount', 'desc'), limit(30)))
         ]);
 
         // Filter out users with 0 or undefined reviewCount, then sort and assign ranks
@@ -311,6 +357,26 @@ export default {
           initialRanks.set(user.id, index);
         });
         leaderboardRanks.value = initialRanks;
+
+        // Filter out users with 0 or undefined commentCount for commenter ranks
+        const usersWithComments = commentersSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(user => {
+            const count = Number(user.commentCount) || 0;
+            return count > 0;
+          })
+          .sort((a, b) => {
+            const countA = Number(a.commentCount) || 0;
+            const countB = Number(b.commentCount) || 0;
+            return countB - countA;
+          })
+          .slice(0, 10);
+        
+        const initialCommenterRanks = new Map();
+        usersWithComments.forEach((user, index) => {
+          initialCommenterRanks.set(user.id, index);
+        });
+        commenterRanks.value = initialCommenterRanks;
 
         restaurantsMap.value.clear();
         restaurantsSnap.forEach(doc => {
@@ -353,6 +419,37 @@ export default {
         );
         unsubscribes.push(unsubLeaderboard);
 
+        const commenterQuery = query(collection(db, 'users'), orderBy('commentCount', 'desc'), limit(30));
+        const unsubCommenters = onSnapshot(
+          commenterQuery,
+          (commentersSnap) => {
+            // Filter out users with 0 or undefined commentCount
+            const usersWithComments = commentersSnap.docs
+              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .filter(user => {
+                const count = Number(user.commentCount) || 0;
+                return count > 0;
+              })
+              .sort((a, b) => {
+                const countA = Number(a.commentCount) || 0;
+                const countB = Number(b.commentCount) || 0;
+                return countB - countA;
+              })
+              .slice(0, 10);
+            
+            const newCommenterRanks = new Map();
+            usersWithComments.forEach((user, index) => {
+              newCommenterRanks.set(user.id, index);
+            });
+            commenterRanks.value = newCommenterRanks;
+            processAndSetPosts();
+          },
+          (error) => {
+            console.error('Error in commenters listener:', error);
+          }
+        );
+        unsubscribes.push(unsubCommenters);
+
         const processSnapshot = (snapshot) => {
           snapshot.docChanges().forEach(change => {
             if (change.type === 'removed') {
@@ -361,7 +458,20 @@ export default {
               const docData = change.doc.data();
               const restaurant = restaurantsMap.value.get(docData.restaurantId);
               const user = usersMap.get(docData.userId);
-              const rank = leaderboardRanks.value.get(docData.userId); // Now guaranteed to have initial ranks
+              const reviewerRank = leaderboardRanks.value.get(docData.userId);
+              const commenterRank = commenterRanks.value.get(docData.userId);
+              
+              // Build array of all applicable medals
+              const medals = [];
+              if (reviewerRank !== undefined) {
+                const medalData = getMedalWithTitle(reviewerRank, 'reviewers');
+                if (medalData) medals.push(medalData);
+              }
+              if (commenterRank !== undefined) {
+                const medalData = getMedalWithTitle(commenterRank, 'commenters');
+                if (medalData) medals.push(medalData);
+              }
+              
               const post = {
                 ...docData,
                 id: change.doc.id,
@@ -372,10 +482,21 @@ export default {
                 distance: userLocation.value && restaurant?.location ? getDistance(userLocation.value.lat, userLocation.value.lng, restaurant.location.lat, restaurant.location.lng) : null,
                 userName: user?.displayName || 'Unknown User',
                 userPhoto: user?.photoURL || null,
-                medal: getMedal(rank),
+                userBadges: [],
+                medals: medals,
                 likeCount: 0,
                 isLiked: false
               };
+              
+              // Load badges for this user asynchronously
+              loadUserBadges(docData.userId).then(badges => {
+                const postInMap = allPosts.get(post.id);
+                if (postInMap) {
+                  postInMap.userBadges = badges;
+                  processAndSetPosts(); // Re-render to show badges
+                }
+              });
+              
               allPosts.set(post.id, post);
               
               // Set up like listener for this post
@@ -532,6 +653,17 @@ export default {
       if (index === 2) return '🥉';
       if (index >= 3 && index < 10) return '🏅';
       return null;
+    };
+
+    const getMedalWithTitle = (index, type) => {
+      const medal = getMedal(index);
+      if (!medal) return null;
+      const titles = {
+        reviewers: 'Top Reviewer',
+        commenters: 'Top Commenter',
+        state: 'State Leader'
+      };
+      return { medal, title: `${index + 1}. ${titles[type]}` };
     };
 
     const isInBucketList = (restaurantId) => {
@@ -810,6 +942,17 @@ export default {
   gap: 0.5em;
 }
 
+.post-badges {
+  display: flex;
+  gap: 2px;
+}
+
+.post-badges :deep(.badge) {
+  font-size: 0.8em;
+  width: 18px;
+  height: 18px;
+}
+
 .action-btn {
     background: none;
     border: none;
@@ -894,6 +1037,13 @@ export default {
 
 .medal {
   font-size: 1.1em;
+  cursor: help;
+}
+
+.medals {
+  display: flex;
+  gap: 0.25em;
+  align-items: center;
 }
 
 .user-name {
